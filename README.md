@@ -2,11 +2,6 @@
 
 Initial project scaffold for a deep learning model repository.
 
-At the moment, this repo includes:
-
-- a Conda environment definition in `environment.yml`
-- a `.gitignore` configured for deep learning workflows
-
 ## Setup
 
 Create the environment:
@@ -22,6 +17,23 @@ Update the environment after changing dependencies:
 conda env update -f environment.yml --prune
 ```
 
+## Repo Structure
+
+```bash
+flowIDS
+├── README.md
+├── assets
+├── docs
+├── environment.yml             # reproducible environment
+├── notebooks
+│   └── experiments             # experiments done in colab
+├── scripts                     # helper scripts
+└── src                         # main model codebase
+```
+
 ## Notes
 
-This repository is currently a starting point. Add model code, training scripts, notebooks, and dataset documentation as the project develops.
+This repository is currently a starting point.
+
+> [!IMPORTANT]
+> TODO: Add model code, training scripts, notebooks, and dataset documentation as the project develops.

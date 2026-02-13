@@ -1,4 +1,4 @@
-name: flowgraphnet
+name: flowIDS
 channels:
   - conda-forge
 dependencies:
