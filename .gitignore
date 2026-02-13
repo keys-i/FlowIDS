@@ -1,0 +1,66 @@
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.conda/
+.python-version
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data and artifacts
+data/raw/
+data/interim/
+data/processed/
+datasets/
+artifacts/
+outputs/
+results/
+predictions/
+cache/
+.cache/
+
+# Training checkpoints / model weights
+checkpoints/
+weights/
+*.ckpt
+*.pt
+*.pth
+*.pkl
+*.joblib
+*.h5
+*.hdf5
+*.onnx
+*.pb
+*.tflite
+*.safetensors
+
+# Logs and experiment tracking
+logs/
+*.log
+runs/
+wandb/
+mlruns/
+lightning_logs/
+tb_logs/
+events.out.tfevents*
