@@ -8,7 +8,7 @@ Create the environment:
 
 ```bash
 conda env create -f environment.yml
-conda activate flowgraphnet
+conda activate flowIDS
 ```
 
 Update the environment after changing dependencies:
