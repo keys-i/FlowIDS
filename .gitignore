@@ -29,6 +29,9 @@ ENV/
 .ipynb_checkpoints/
 
 # Data and artifacts
+notebook/experiment/*
+*.duckdb
+data/v*/
 data/raw/
 data/interim/
 data/processed/

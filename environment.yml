@@ -7,3 +7,5 @@ dependencies:
   - setuptools
   - wheel
   - polars
+  - click
+  - rich
