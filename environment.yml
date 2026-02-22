@@ -7,5 +7,7 @@ dependencies:
   - setuptools
   - wheel
   - polars
+  - pyarrow
+  - matplotlib
   - click
   - rich

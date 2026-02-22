@@ -183,20 +183,23 @@ Before modelling, can we explain:
    - Do not automatically allow them into later predictive views
 
 ### 6. Data Preparation Stage
-1. Define the prepared dataset views
+1. Define the prepared dataset outputs
 
-| View | Purpose | Included fields |
+| Output | Purpose | Included fields |
 | --- | --- | --- |
-| Raw audit view | Provenance and leakage inspection | All original fields plus row hash and derived day key |
-| Clean predictive tabular view | Later baseline models | Only approved measurement features and approved encoded categorical features |
-| Graph-ready flow view | Later graph construction | The same cleaned measurements plus entity references kept outside the predictive matrix |
+| Audit-ready prepared view | Preserve provenance and support later verification | All original fields, immutable row ID or row hash, derived chronology fields such as `flow_day`, and preparation metadata |
+| Predictive tabular view | Input for later baseline tabular models | Approved measurement features, approved encoded categorical features, derived preparation features, and the chosen target view |
+| Graph-ready flow view | Input for later graph construction | Cleaned measurements, chronology fields, target views, and entity references retained outside the predictive matrix |
 
-2. Sort and standardize chronology
-   - Sort all rows by `FLOW_START_MILLISECONDS`
+2. Standardize chronology and row identity
+   - Preserve an immutable row identifier or row hash before downstream transformations
    - Derive `flow_day` from `FLOW_START_MILLISECONDS`
-   - Preserve the original row order in the audit manifest if needed
-3. Apply column-level preparation rules
-   - Drop from predictive use by default:
+   - Sort the prepared outputs by `FLOW_START_MILLISECONDS`
+   - Preserve the original row order separately if it is needed for provenance or reconstruction
+   - Record chronology assumptions explicitly in the preparation manifest
+
+3. Apply feature inclusion rules for prepared views
+   - Exclude from the predictive matrix by default:
      - `IPV4_SRC_ADDR`
      - `IPV4_DST_ADDR`
      - raw `FLOW_START_MILLISECONDS`
@@ -217,19 +220,31 @@ Before modelling, can we explain:
      - packet-size summaries
      - TTL fields
      - IAT summaries
+
 4. Handle protocol-specific applicability explicitly
    - For ICMP-related fields, define when `ICMP_TYPE` and `ICMP_IPV4_TYPE` are meaningful
    - For DNS-related fields, define when `DNS_QUERY_ID`, `DNS_QUERY_TYPE`, and `DNS_TTL_ANSWER` are meaningful
    - For FTP-related fields, define when `FTP_COMMAND_RET_CODE` is meaningful
    - Create applicability indicators if zero is being used as a placeholder
-5. Handle skew and sparsity
+   - Decide whether non-applicable values stay null, are masked, are bucketed, or are paired with explicit applicability flags
+
+5. Apply modelling-oriented feature transformations
    - Apply `log1p` to highly skewed byte, packet, throughput, and retransmission fields where justified
-   - Record sparse columns that should be kept, bucketed, or removed
+   - Record sparse columns that should be kept, bucketed, masked behind applicability flags, or removed
    - Record whether extreme values are capped, winsorized, or left untouched
-6. Prepare reproducible outputs
+   - Keep every transformation explicit and reproducible
+
+6. Define prepared target views
+   - Keep `Label` as the binary target view
+   - Keep `Attack` as the fine-grained family view
+   - Create a thesis-level coarse family mapping and record it explicitly
+   - Keep target columns in supervised outputs but exclude them from the predictive feature matrix itself
+
+7. Save reproducible preparation artifacts
    - Save row-level hashes or immutable row IDs
-   - Save the cleaned column list in order
-   - Save every drop, transformation, derived field, and label mapping
+   - Save the cleaned column list in order for each prepared view
+   - Save every drop, transformation, derived field, applicability rule, and label mapping
+   - Save the preparation manifest so the prepared dataset can be rebuilt exactly
 
 ### 7. Deliverables and Quality Gates
 1. Save artefacts
