@@ -10,15 +10,18 @@ ID: 49088276
 
 import torch
 
+from src.data import FlowDataset, build_loaders
+from src.config import load_config
+
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = True
 
-DATA_DIR = "../data/v3/pqt"
-NF_DATASET = "NF-CICIDS2018-v3.parquet"
+config = load_config("config.toml")
 
 # TODO: preprocess the dataset to build the dataset
-CSV_PATH = f"{DATA_DIR}/{NF_DATASET}"
 # build_dataset function usage here
+dataset = FlowDataset(config)
+_, _, _ = build_loaders(dataset, config)
 
 # TODO: initialise the model and device for GPU
 

@@ -1,0 +1,27 @@
+# Baseline 1 configuration for the FlowTransformer++ NetFlow pipeline.
+
+[paths]
+data = "hf://datasets/keys-i/netFlow-v3/v3/pqt/NF-CICIDS2018-v3.parquet"
+out = "out"
+
+[dataset]
+time_col = "FLOW_START_MILLISECONDS"
+
+[dataset.window]
+len = 8
+stride = 8
+drop_incomplete = false
+pad_value = -1
+
+[dataset.polars]
+engine = "cpu"
+threads = 8
+
+[dataloaders]
+batch_size = 256
+num_workers = 4
+pin_memory = true
+
+[dataloaders.split]
+splits = [0.7, 0.15, 0.15]
+mode = "temporal"

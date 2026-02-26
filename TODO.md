@@ -41,28 +41,28 @@ FlowTransformer++ is:
 Lock what the model sees and predicts.
 
 ### Checklist
-- [ ] Lock dataset version and schema
-- [ ] Write down all numeric features
-- [ ] Write down all categorical features
-- [ ] Mark which features are available at inference time
-- [ ] remove leakage-prone or suspicious fields
-- [ ] define prediction unit as fixed temporal window
-- [ ] freeze main targets:
-  - [ ] binary malicious vs benign
-  - [ ] coarse attack-family classification
-- [ ] freeze auxiliary targets if used:
-  - [ ] `PROTOCOL`
-  - [ ] `L7_PROTO`
-  - [ ] `DST_PORT`
-  - [ ] `SRC_PORT`
-  - [ ] `IN_BYTES`, `OUT_BYTES`
-  - [ ] `IN_PKTS`, `OUT_PKTS`
+- [x] Lock dataset version and schema
+- [-] Write down all numeric features
+- [x] Write down all categorical features
+- [x] Mark which features are available at inference time
+- [x] remove leakage-prone or suspicious fields
+- [x] define prediction unit as fixed temporal window
+- [x] freeze main targets:
+  - [x] binary malicious vs benign
+  - [x] coarse attack-family classification
+- [x] freeze auxiliary targets if used:
+  - [x] `PROTOCOL`
+  - [x] `L7_PROTO`
+  - [x] `DST_PORT`
+  - [x] `SRC_PORT`
+  - [x] `IN_BYTES`, `OUT_BYTES`
+  - [x] `IN_PKTS`, `OUT_PKTS`
 
 ### Deliverables
-- [ ] dataset card
-- [ ] feature inventory
-- [ ] leakage note
-- [ ] target definition note
+- [x] dataset card
+- [x] feature inventory
+- [x] leakage note
+- [x] target definition note
 
 ---
 
@@ -72,16 +72,16 @@ Lock what the model sees and predicts.
 Make sure Baseline 1 is learning signal, not contamination.
 
 ### Checklist
-- [ ] check timestamp consistency
-- [ ] check duplicate and near-duplicate rows
-- [ ] check impossible labels
-- [ ] check temporal clustering by attack day or campaign
-- [ ] check whether neighbouring rows leak across splits
-- [ ] run a simple leakage baseline on suspicious columns
-- [ ] confirm no single suspicious feature can produce unrealistic accuracy
+- [x] check timestamp consistency
+- [x] check duplicate and near-duplicate rows
+- [x] check impossible labels
+- [x] check temporal clustering by attack day or campaign
+- [x] check whether neighbouring rows leak across splits
+- [x] run a simple leakage baseline on suspicious columns
+- [x] confirm no single suspicious feature can produce unrealistic accuracy
 
 ### Pass condition
-- [ ] no obvious feature or split artifact explains the expected performance
+- [x] no obvious feature or split artifact explains the expected performance
 
 ---
 
@@ -96,22 +96,22 @@ Turn raw flows into the fixed temporal unit used by Baseline 1.
 - later ablate: `8 / 16 / 32`
 
 ### Checklist
-- [ ] build windows deterministically
-- [ ] preserve order inside each window
-- [ ] keep the window builder frozen once Baseline 1 starts
-- [ ] store mapping from each window back to source rows
-- [ ] define truncation or padding rules if needed
-- [ ] emit optional mask if padding exists
+- [x] build windows deterministically
+- [x] preserve order inside each window
+- [x] keep the window builder frozen once Baseline 1 starts
+- [x] store mapping from each window back to source rows
+- [x] define truncation or padding rules if needed
+- [x] emit optional mask if padding exists
 
 ### Output per timestep
-- [ ] numeric flow features
-- [ ] categorical protocol / port features
-- [ ] optional padding mask
+- [x] numeric flow features
+- [x] categorical protocol / port features
+- [x] optional padding mask
 
 ### Deliverables
-- [ ] window builder script
-- [ ] saved window index map
-- [ ] reproducibility note for `L` and stride
+- [x] window builder script
+- [x] saved window index map
+- [x] reproducibility note for `L` and stride
 
 ---
 
