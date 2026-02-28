@@ -1,6 +1,7 @@
 """Temporal split, train-only transforms"""
 
 from __future__ import annotations
+
 from collections.abc import Sized
 from typing import Optional, cast
 
@@ -92,9 +93,7 @@ class CategoricalTransform:
     ) -> tuple[np.ndarray, np.ndarray]:
         """Transform target labels."""
         if self.binary_encoder_ is None or self.family_encoder_ is None:
-            raise RuntimeError(
-                "CategoricalTransform must be fit before transform_targets()."
-            )
+            raise RuntimeError("CategoricalTransform must be fit before transform_targets().")
         y_binary_out = np.asarray(
             self.binary_encoder_.transform(y_binary),
             dtype=np.int64,

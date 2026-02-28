@@ -3,6 +3,7 @@ The actual dataset class that reads and writes
 """
 
 from __future__ import annotations
+
 from typing import Any
 
 import numpy as np
@@ -10,7 +11,7 @@ import torch
 from sklearn.utils.class_weight import compute_class_weight
 from torch.utils.data import DataLoader, Dataset, WeightedRandomSampler
 
-from .transform import split, NumericTransform, CategoricalTransform, TransformedDataset
+from .transform import CategoricalTransform, NumericTransform, TransformedDataset, split
 
 
 def _collect_train_arrays(
@@ -36,9 +37,7 @@ def _collect_train_arrays(
         y_family_rows.append(sample["y_family"])
 
     if not x_num_rows or not x_cat_rows:
-        raise ValueError(
-            "Training split did not contain any valid timesteps to fit transforms."
-        )
+        raise ValueError("Training split did not contain any valid timesteps to fit transforms.")
 
     x_num_train = np.concatenate(x_num_rows, axis=0)
     x_cat_train = np.concatenate(x_cat_rows, axis=0)
@@ -88,12 +87,10 @@ def _build_sampler(
     ).astype(np.float32)
 
     binary_map = {
-        int(cls): float(weight)
-        for cls, weight in zip(binary_classes, binary_weights, strict=False)
+        int(cls): float(weight) for cls, weight in zip(binary_classes, binary_weights, strict=False)
     }
     family_map = {
-        int(cls): float(weight)
-        for cls, weight in zip(family_classes, family_weights, strict=False)
+        int(cls): float(weight) for cls, weight in zip(family_classes, family_weights, strict=False)
     }
 
     sample_weights = [
@@ -213,9 +210,7 @@ def build_loaders(
     for split_name in ("train", "val", "test"):
         kwargs = dict(loader_kwargs)
         kwargs["shuffle"] = split_name == "train" and sampler is None
-        kwargs["drop_last"] = (
-            config.dataloaders.drop_last_train if split_name == "train" else False
-        )
+        kwargs["drop_last"] = config.dataloaders.drop_last_train if split_name == "train" else False
 
         if split_name == "train" and sampler is not None:
             kwargs["sampler"] = sampler

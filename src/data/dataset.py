@@ -1,6 +1,7 @@
 """Minimal window-based flow dataset for PyTorch."""
 
 from __future__ import annotations
+
 from typing import Any
 
 import polars as pl
@@ -8,7 +9,7 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset
 
-from .features import NUMERIC_FEATURES, CATEGORICAL_FEATURES
+from .features import CATEGORICAL_FEATURES, NUMERIC_FEATURES
 from .window_split import build_fixed_windows
 
 

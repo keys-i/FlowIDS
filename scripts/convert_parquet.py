@@ -74,9 +74,7 @@ def resolve_inputs(raw_inputs: tuple[str, ...]) -> list[Path]:
     return sorted(resolved)
 
 
-def build_output_path(
-    input_path: Path, output_path: Path, all_inputs: list[Path]
-) -> Path:
+def build_output_path(input_path: Path, output_path: Path, all_inputs: list[Path]) -> Path:
     output_path = output_path.resolve()
 
     if len(all_inputs) == 1:
@@ -90,9 +88,7 @@ def build_output_path(
         )
 
     try:
-        common_root = Path(
-            os.path.commonpath([str(path.parent) for path in all_inputs])
-        )
+        common_root = Path(os.path.commonpath([str(path.parent) for path in all_inputs]))
     except ValueError:
         common_root = Path.cwd()
 
@@ -254,9 +250,7 @@ def main(
 
             for future in as_completed(futures):
                 try:
-                    status, input_path, output_file, input_size, output_size = (
-                        future.result()
-                    )
+                    status, input_path, output_file, input_size, output_size = future.result()
 
                     if status == "converted":
                         converted += 1

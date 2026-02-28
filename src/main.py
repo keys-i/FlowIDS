@@ -10,8 +10,8 @@ ID: 49088276
 
 import torch
 
-from src.data import FlowDataset, build_loaders
 from src.config import load_config
+from src.data import FlowDataset, build_loaders
 
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = True
