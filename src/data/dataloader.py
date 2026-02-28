@@ -102,7 +102,7 @@ def _build_sampler(
     ]
 
     sampler = WeightedRandomSampler(
-        weights=torch.as_tensor(sample_weights, dtype=torch.double),
+        weights=sample_weights,
         num_samples=len(sample_weights),
         replacement=True,
         generator=torch.Generator().manual_seed(seed),

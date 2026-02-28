@@ -1,7 +1,8 @@
 """Temporal split, train-only transforms"""
 
 from __future__ import annotations
-from typing import Optional
+from collections.abc import Sized
+from typing import Optional, cast
 
 import numpy as np
 import torch
@@ -94,9 +95,14 @@ class CategoricalTransform:
             raise RuntimeError(
                 "CategoricalTransform must be fit before transform_targets()."
             )
-
-        y_binary_out = self.binary_encoder_.transform(y_binary).astype(np.int64)
-        y_family_out = self.family_encoder_.transform(y_family).astype(np.int64)
+        y_binary_out = np.asarray(
+            self.binary_encoder_.transform(y_binary),
+            dtype=np.int64,
+        )
+        y_family_out = np.asarray(
+            self.family_encoder_.transform(y_family),
+            dtype=np.int64,
+        )
 
         return y_binary_out, y_family_out
 
@@ -129,7 +135,7 @@ class TransformedDataset(Dataset):
 
     def __getitem__(self, index: int) -> dict[str, torch.Tensor]:
         """Return one transformed sample."""
-        sample = self.dataset[index]
+        sample = cast(dict[str, torch.Tensor], self.dataset[index])
 
         x_num = sample["x_num"].cpu().numpy()
         x_cat = sample["x_cat"].cpu().numpy()
@@ -176,7 +182,7 @@ def split(
     if not np.isclose(train_size + val_size + test_size, 1.0):
         raise ValueError("splits must sum to 1.0.")
 
-    n = len(dataset)
+    n = len(cast(Sized, dataset))
     train_end = int(n * train_size)
     val_end = int(n * (train_size + val_size))
 
