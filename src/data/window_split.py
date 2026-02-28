@@ -62,7 +62,7 @@ def build_fixed_windows(
                 "mask": mask.tolist(),
                 "start": int(start),
                 "end": int(min(stop, nrows)),  # exclusive end
-                "length": int(length),         # real, unpadded length
+                "length": int(length),  # real, unpadded length
                 "is_padded": bool(length < window_len),
             }
         )

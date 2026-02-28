@@ -5,6 +5,7 @@ Helper functions to make main flow stay clean.
 import tomllib
 from pathlib import Path
 
+
 # == config area ==
 class Config:
     def __init__(self, data: dict):
@@ -21,9 +22,9 @@ class Config:
 
     def __repr__(self):
         return f"Config({self.__dict__})"
-    
+
+
 def load_config(path: str | Path) -> Config:
     with Path(path).open("rb") as f:
         data = tomllib.load(f)
     return Config(data)
-    

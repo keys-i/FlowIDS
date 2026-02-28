@@ -19,16 +19,10 @@ torch.backends.cudnn.benchmark = True
 config = load_config("config.toml")
 
 # TODO: preprocess the dataset to build the dataset
-# build_dataset function usage here
 dataset = FlowDataset(config)
-_, _, _ = build_loaders(dataset, config)
+train_loader, val_loader, test_loader, _ = build_loaders(dataset, config)
 
 # TODO: initialise the model and device for GPU
-
 # TODO: train the dataset
-
 # TODO: visualise the dataset
-
 # TODO: test the dataset
-
-# main CLI flag handler for everything to give it

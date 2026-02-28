@@ -7,11 +7,19 @@ out = "out"
 [dataset]
 time_col = "FLOW_START_MILLISECONDS"
 
+[dataset.targets]
+binary = "Label"
+family = "Attack"
+
 [dataset.window]
 len = 8
 stride = 8
 drop_incomplete = false
 pad_value = -1
+
+[dataset.transforms]
+clip_quantiles = [1.0, 99.0]
+noise_std = 0.0
 
 [dataset.polars]
 engine = "cpu"
@@ -21,7 +29,11 @@ threads = 8
 batch_size = 256
 num_workers = 4
 pin_memory = true
+balance_train = false
+drop_last_train = false
+seed = 42
 
 [dataloaders.split]
 splits = [0.7, 0.15, 0.15]
 mode = "temporal"
+purge = 1
