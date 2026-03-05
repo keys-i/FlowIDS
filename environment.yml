@@ -15,6 +15,7 @@ dependencies:
   - pyarrow
   - matplotlib
   - pytorch
+  - huggingface_hub
   # dev dependencies
   - tqdm
   - click
