@@ -8,6 +8,7 @@ import polars as pl
 import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset
+from tqdm.auto import tqdm
 
 from src.config import Config
 
@@ -21,6 +22,7 @@ class FlowDataset(Dataset):
     def __init__(self, config: Config) -> None:
         targets_cfg = config.dataset.targets
         window_cfg = config.dataset.window
+        engine = config.dataset.polars.engine
 
         self.numeric_features = NUMERIC_FEATURES
         self.categorical_features = CATEGORICAL_FEATURES
@@ -35,20 +37,25 @@ class FlowDataset(Dataset):
             + [self.binary_target, self.family_target]
         )
 
-        self.df = (
-            pl.scan_parquet(config.paths.data)
-            .select(columns)
-            .sort(config.dataset.time_col)
-            .collect()
-        )
+        with tqdm(total=2, desc="dataset", unit="step") as progress:
+            progress.set_postfix_str("load parquet")
+            self.df = (
+                pl.scan_parquet(config.paths.data)
+                .select(columns)
+                .sort(config.dataset.time_col)
+                .collect(engine=engine)
+            )
+            progress.update()
 
-        self.windows = build_fixed_windows(
-            nrows=self.df.height,
-            window_len=self.window_len,
-            stride=window_cfg.stride,
-            drop_incomplete=window_cfg.drop_incomplete,
-            pad_value=window_cfg.pad_value,
-        )
+            progress.set_postfix_str("build windows")
+            self.windows = build_fixed_windows(
+                nrows=self.df.height,
+                window_len=self.window_len,
+                stride=window_cfg.stride,
+                drop_incomplete=window_cfg.drop_incomplete,
+                pad_value=window_cfg.pad_value,
+            )
+            progress.update()
 
     def __len__(self) -> int:
         """Return the number of windows."""

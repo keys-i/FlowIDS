@@ -8,6 +8,7 @@ import numpy as np
 import torch
 from sklearn.utils.class_weight import compute_class_weight
 from torch.utils.data import DataLoader, Dataset, WeightedRandomSampler
+from tqdm.auto import tqdm
 
 from src.config import Config
 
@@ -24,7 +25,12 @@ def _collect_train_arrays(
     y_binary_rows = []
     y_family_rows = []
 
-    for index in train_indices:
+    for index in tqdm(
+        train_indices,
+        desc="dataloaders: train arrays",
+        leave=False,
+        unit="window",
+    ):
         sample = dataset[index]
         mask = sample["mask"].cpu().numpy().astype(bool)
 
@@ -52,16 +58,24 @@ def _collect_targets(
     indices: list[int],
     y_binary_dtype: np.dtype[Any],
     y_family_dtype: np.dtype[Any],
+    split_name: str,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Collect window-level targets for a split."""
-    y_binary = np.asarray(
-        [dataset[i]["y_binary"] for i in indices],
-        dtype=y_binary_dtype,
-    )
-    y_family = np.asarray(
-        [dataset[i]["y_family"] for i in indices],
-        dtype=y_family_dtype,
-    )
+    y_binary_rows = []
+    y_family_rows = []
+
+    for index in tqdm(
+        indices,
+        desc=f"dataloaders: {split_name} targets",
+        leave=False,
+        unit="window",
+    ):
+        sample = dataset[index]
+        y_binary_rows.append(sample["y_binary"])
+        y_family_rows.append(sample["y_family"])
+
+    y_binary = np.asarray(y_binary_rows, dtype=y_binary_dtype)
+    y_family = np.asarray(y_family_rows, dtype=y_family_dtype)
     return y_binary, y_family
 
 
@@ -123,105 +137,121 @@ def build_loaders(
     if split_cfg.mode != "temporal":
         raise ValueError(f"Unsupported split mode: {split_cfg.mode}.")
 
-    train_indices, val_indices, test_indices = split(
-        dataset=dataset,
-        splits=split_cfg.splits,
-        purge=split_cfg.purge,
-    )
-
-    x_num_train, x_cat_train, y_binary_train, y_family_train = _collect_train_arrays(
-        dataset=dataset,
-        train_indices=train_indices,
-    )
-
-    numeric_transform = NumericTransform(
-        clip_quantiles=transforms_cfg.clip_quantiles,
-    )
-    numeric_transform.fit(x_num_train)
-
-    categorical_transform = CategoricalTransform()
-    categorical_transform.fit(
-        x_cat=x_cat_train,
-        y_binary=y_binary_train,
-        y_family=y_family_train,
-    )
-
-    split_indices = {
-        "train": train_indices,
-        "val": val_indices,
-        "test": test_indices,
-    }
-
-    encoded_targets = {}
-    split_datasets = {}
-
-    for split_name, indices in split_indices.items():
-        y_binary_raw, y_family_raw = _collect_targets(
+    with tqdm(total=6, desc="dataloaders", unit="step") as progress:
+        progress.set_postfix_str("split dataset")
+        train_indices, val_indices, test_indices = split(
             dataset=dataset,
-            indices=indices,
-            y_binary_dtype=y_binary_train.dtype,
-            y_family_dtype=y_family_train.dtype,
+            splits=split_cfg.splits,
+            purge=split_cfg.purge,
         )
+        progress.update()
 
-        y_binary_encoded, y_family_encoded = categorical_transform.transform_targets(
-            y_binary_raw,
-            y_family_raw,
-        )
-        encoded_targets[split_name] = (y_binary_encoded, y_family_encoded)
-
-        split_datasets[split_name] = TransformedDataset(
+        progress.set_postfix_str("collect train arrays")
+        x_num_train, x_cat_train, y_binary_train, y_family_train = _collect_train_arrays(
             dataset=dataset,
-            indices=indices,
-            numeric_transform=numeric_transform,
-            categorical_transform=categorical_transform,
-            encoded_binary=y_binary_encoded,
-            encoded_family=y_family_encoded,
-            train=(split_name == "train"),
-            noise_std=transforms_cfg.noise_std if split_name == "train" else 0.0,
+            train_indices=train_indices,
         )
+        progress.update()
 
-    train_binary, train_family = encoded_targets["train"]
-
-    sampler = None
-    binary_loss_weight = None
-    family_loss_weight = None
-
-    if config.dataloaders.balance_train:
-        sampler, binary_loss_weight, family_loss_weight = _build_sampler(
-            y_binary=train_binary,
-            y_family=train_family,
-            seed=config.dataloaders.seed,
+        progress.set_postfix_str("fit numeric transform")
+        numeric_transform = NumericTransform(
+            clip_quantiles=transforms_cfg.clip_quantiles,
         )
-    else:
-        _, binary_loss_weight, family_loss_weight = _build_sampler(
-            y_binary=train_binary,
-            y_family=train_family,
-            seed=config.dataloaders.seed,
+        numeric_transform.fit(x_num_train)
+        progress.update()
+
+        progress.set_postfix_str("fit categorical transform")
+        categorical_transform = CategoricalTransform()
+        categorical_transform.fit(
+            x_cat=x_cat_train,
+            y_binary=y_binary_train,
+            y_family=y_family_train,
         )
+        progress.update()
 
-    persistent_workers = config.dataloaders.num_workers > 0
+        split_indices = {
+            "train": train_indices,
+            "val": val_indices,
+            "test": test_indices,
+        }
 
-    loader_kwargs = {
-        "batch_size": config.dataloaders.batch_size,
-        "num_workers": config.dataloaders.num_workers,
-        "pin_memory": config.dataloaders.pin_memory,
-        "persistent_workers": persistent_workers,
-    }
+        encoded_targets = {}
+        split_datasets = {}
 
-    loaders = {}
+        progress.set_postfix_str("encode splits")
+        for split_name, indices in split_indices.items():
+            y_binary_raw, y_family_raw = _collect_targets(
+                dataset=dataset,
+                indices=indices,
+                y_binary_dtype=y_binary_train.dtype,
+                y_family_dtype=y_family_train.dtype,
+                split_name=split_name,
+            )
 
-    for split_name in ("train", "val", "test"):
-        kwargs = dict(loader_kwargs)
-        kwargs["shuffle"] = split_name == "train" and sampler is None
-        kwargs["drop_last"] = config.dataloaders.drop_last_train if split_name == "train" else False
+            y_binary_encoded, y_family_encoded = categorical_transform.transform_targets(
+                y_binary_raw,
+                y_family_raw,
+            )
+            encoded_targets[split_name] = (y_binary_encoded, y_family_encoded)
 
-        if split_name == "train" and sampler is not None:
-            kwargs["sampler"] = sampler
+            split_datasets[split_name] = TransformedDataset(
+                dataset=dataset,
+                indices=indices,
+                numeric_transform=numeric_transform,
+                categorical_transform=categorical_transform,
+                encoded_binary=y_binary_encoded,
+                encoded_family=y_family_encoded,
+                train=(split_name == "train"),
+                noise_std=transforms_cfg.noise_std if split_name == "train" else 0.0,
+            )
+        progress.update()
 
-        loaders[split_name] = DataLoader(
-            split_datasets[split_name],
-            **kwargs,
-        )
+        train_binary, train_family = encoded_targets["train"]
+
+        sampler = None
+        binary_loss_weight = None
+        family_loss_weight = None
+
+        progress.set_postfix_str("build loaders")
+        if config.dataloaders.balance_train:
+            sampler, binary_loss_weight, family_loss_weight = _build_sampler(
+                y_binary=train_binary,
+                y_family=train_family,
+                seed=config.dataloaders.seed,
+            )
+        else:
+            _, binary_loss_weight, family_loss_weight = _build_sampler(
+                y_binary=train_binary,
+                y_family=train_family,
+                seed=config.dataloaders.seed,
+            )
+
+        persistent_workers = config.dataloaders.num_workers > 0
+
+        loader_kwargs = {
+            "batch_size": config.dataloaders.batch_size,
+            "num_workers": config.dataloaders.num_workers,
+            "pin_memory": config.dataloaders.pin_memory,
+            "persistent_workers": persistent_workers,
+        }
+
+        loaders = {}
+
+        for split_name in ("train", "val", "test"):
+            kwargs = dict(loader_kwargs)
+            kwargs["shuffle"] = split_name == "train" and sampler is None
+            kwargs["drop_last"] = (
+                config.dataloaders.drop_last_train if split_name == "train" else False
+            )
+
+            if split_name == "train" and sampler is not None:
+                kwargs["sampler"] = sampler
+
+            loaders[split_name] = DataLoader(
+                split_datasets[split_name],
+                **kwargs,
+            )
+        progress.update()
 
     state = {
         "train_indices": train_indices,
