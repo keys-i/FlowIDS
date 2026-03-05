@@ -9,6 +9,8 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset
 
+from src.config import Config
+
 from .features import CATEGORICAL_FEATURES, NUMERIC_FEATURES
 from .window_split import build_fixed_windows
 
@@ -16,7 +18,7 @@ from .window_split import build_fixed_windows
 class FlowDataset(Dataset):
     """Return one fixed temporal window as tensors."""
 
-    def __init__(self, config) -> None:
+    def __init__(self, config: Config) -> None:
         targets_cfg = config.dataset.targets
         window_cfg = config.dataset.window
 

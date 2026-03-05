@@ -1,6 +1,4 @@
-"""
-The actual dataset class that reads and writes
-"""
+"""DataLoader construction and train-only preprocessing."""
 
 from __future__ import annotations
 
@@ -10,6 +8,8 @@ import numpy as np
 import torch
 from sklearn.utils.class_weight import compute_class_weight
 from torch.utils.data import DataLoader, Dataset, WeightedRandomSampler
+
+from src.config import Config
 
 from .transform import CategoricalTransform, NumericTransform, TransformedDataset, split
 
@@ -50,8 +50,8 @@ def _collect_train_arrays(
 def _collect_targets(
     dataset: Dataset,
     indices: list[int],
-    y_binary_dtype: np.dtype,
-    y_family_dtype: np.dtype,
+    y_binary_dtype: np.dtype[Any],
+    y_family_dtype: np.dtype[Any],
 ) -> tuple[np.ndarray, np.ndarray]:
     """Collect window-level targets for a split."""
     y_binary = np.asarray(
@@ -114,15 +114,18 @@ def _build_sampler(
 
 def build_loaders(
     dataset: Dataset,
-    config: Any,
+    config: Config,
 ) -> tuple[DataLoader, DataLoader, DataLoader, dict[str, Any]]:
-    """Fit transforms on train only and build train/val/test loaders"""
-    split_cfg = config.dataloaders.split
+    """Fit transforms on train only and build train/val/test loaders."""
+    split_cfg = config.dataset.split
     transforms_cfg = config.dataset.transforms
+
+    if split_cfg.mode != "temporal":
+        raise ValueError(f"Unsupported split mode: {split_cfg.mode}.")
 
     train_indices, val_indices, test_indices = split(
         dataset=dataset,
-        splits=tuple(split_cfg.splits),
+        splits=split_cfg.splits,
         purge=split_cfg.purge,
     )
 
@@ -132,7 +135,7 @@ def build_loaders(
     )
 
     numeric_transform = NumericTransform(
-        clip_quantiles=tuple(transforms_cfg.clip_quantiles),
+        clip_quantiles=transforms_cfg.clip_quantiles,
     )
     numeric_transform.fit(x_num_train)
 

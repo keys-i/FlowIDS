@@ -21,6 +21,11 @@ pad_value = -1
 clip_quantiles = [1.0, 99.0]
 noise_std = 0.0
 
+[dataset.split]
+splits = [0.7, 0.15, 0.15]
+mode = "temporal"
+purge = 1
+
 [dataset.polars]
 engine = "cpu"
 threads = 8
@@ -33,7 +38,14 @@ balance_train = false
 drop_last_train = false
 seed = 42
 
-[dataloaders.split]
-splits = [0.7, 0.15, 0.15]
-mode = "temporal"
-purge = 1
+[model]
+device = "cuda"
+d_model = 256
+nhead = 8
+num_layers = 6
+dim_feedforward = 1024
+dropout = 0.1
+
+[train]
+lr = 1e-4
+weight_decay = 1e-2
