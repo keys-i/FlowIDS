@@ -1,7 +1,7 @@
 # Baseline 1 configuration for the FlowTransformer++ NetFlow pipeline.
 
 [paths]
-data = "hf://datasets/keys-i/netFlow-v3/v3/pqt/NF-CICIDS2018-v3.parquet"
+data = "data/NF-CICIDS2018-v3.parquet"
 out = "out"
 
 [dataset]
@@ -28,7 +28,6 @@ purge = 1
 
 [dataset.polars]
 engine = "cpu"
-threads = 8
 
 [dataloaders]
 batch_size = 256
@@ -47,5 +46,6 @@ dim_feedforward = 1024
 dropout = 0.1
 
 [train]
+epochs = 10
 lr = 1e-4
 weight_decay = 1e-2
