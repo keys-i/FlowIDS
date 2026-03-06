@@ -22,13 +22,13 @@ FlowTransformer++ is:
 - the main temporal-attention reference point before any looped or graph model
 
 ### Fixed design rules
-- [ ] same dataset version used everywhere
-- [ ] same prediction unit used everywhere
+- [x] same dataset version used everywhere
+- [x] same prediction unit used everywhere
 - [ ] same split used everywhere
-- [ ] same input features used everywhere
+- [x] same input features used everywhere
 - [ ] same evaluation protocol used everywhere
-- [ ] no looped recurrence in Baseline 1
-- [ ] no graph structure in Baseline 1
+- [x] no looped recurrence in Baseline 1
+- [x] no graph structure in Baseline 1
 
 ### Success condition
 - [ ] Baseline 1 is strong, reproducible, and fair enough to act as the reference model for all later work
@@ -42,7 +42,7 @@ Lock what the model sees and predicts.
 
 ### Checklist
 - [x] Lock dataset version and schema
-- [-] Write down all numeric features
+- [x] Write down all numeric features
 - [x] Write down all categorical features
 - [x] Mark which features are available at inference time
 - [x] remove leakage-prone or suspicious fields
@@ -90,9 +90,9 @@ Make sure Baseline 1 is learning signal, not contamination.
 ## Objective
 Turn raw flows into the fixed temporal unit used by Baseline 1.
 
-### Default
-- window length: `L = 32`
-- stride: `32`
+### Current default
+- window length: `L = 8`
+- stride: `8`
 - later ablate: `8 / 16 / 32`
 
 ### Checklist
@@ -113,6 +113,9 @@ Turn raw flows into the fixed temporal unit used by Baseline 1.
 - [x] saved window index map
 - [x] reproducibility note for `L` and stride
 
+> [!note]
+> The workflow originally mentioned `L = 32` as the default, but the current implemented baseline is using `L = 8` and `stride = 8`. That is fine as long as the baseline is frozen and later ablations explicitly test `16` and `32`.
+
 ---
 
 # 5. Split protocol
@@ -123,16 +126,21 @@ Make Baseline 1 evaluation believable.
 ### Default
 Use a **block-aware temporal split**, not random row splitting.
 
+### Current implementation
+- temporal split with `splits = [0.7, 0.15, 0.15]`
+- purge gap between splits
+- split handled in the dataset / dataloader pipeline
+
 ### Checklist
 - [ ] freeze train / val / test split once
-- [ ] split before model tuning
-- [ ] prevent overlapping-window contamination across splits
+- [x] split before model tuning
+- [x] prevent overlapping-window contamination across splits
 - [ ] save exact split indices
 - [ ] prepare one harsher pure-temporal stress split
 
 ### Deliverables
 - [ ] split file
-- [ ] split generation script
+- [x] split generation script
 - [ ] stress-split file
 
 ---
@@ -143,24 +151,25 @@ Use a **block-aware temporal split**, not random row splitting.
 Specify the exact FlowTransformer++ baseline.
 
 ### Core structure
-- [ ] numeric projection into model dimension
-- [ ] additive categorical embeddings
-- [ ] positional encoding
-- [ ] learnable `[CLS]` token or equivalent global token
-- [ ] pre-LN Transformer encoder
-- [ ] dual pooling:
-  - [ ] CLS pooling
-  - [ ] mean pooling
-- [ ] binary classification head
-- [ ] family classification head
-- [ ] optional auxiliary categorical heads
+- [x] numeric projection into model dimension
+- [x] additive categorical embeddings
+- [x] positional encoding
+- [x] learnable `[CLS]` token or equivalent global token
+- [x] pre-LN Transformer encoder
+- [x] dual pooling:
+  - [x] CLS pooling
+  - [x] mean pooling
+- [x] binary classification head
+- [x] family classification head
+- [x] optional auxiliary categorical heads
+- [x] optional auxiliary numeric heads
 - [ ] optional auxiliary numeric heteroscedastic heads
 
 ### Fixed architecture checklist
-- [ ] choose `d_model`
-- [ ] choose number of heads
-- [ ] choose number of encoder layers
-- [ ] choose FFN width
+- [x] choose `d_model`
+- [x] choose number of heads
+- [x] choose number of encoder layers
+- [x] choose FFN width
 - [ ] record total parameter count
 - [ ] record FLOPs or throughput estimate
 
@@ -168,6 +177,18 @@ Specify the exact FlowTransformer++ baseline.
 - [ ] architecture spec table
 - [ ] parameter count
 - [ ] forward-pass cost note
+
+> [!note]
+> The model components are implemented:
+> - embedding
+> - position
+> - token
+> - backbone
+> - pooling
+> - heads
+> - main model wiring  
+>
+> What is still missing is freezing the exact chosen architecture in a written spec table and recording model size / cost.
 
 ---
 
@@ -177,26 +198,31 @@ Specify the exact FlowTransformer++ baseline.
 Make the representation choice explicit and frozen.
 
 ### Representation
-- [ ] use dual pooling
-- [ ] concatenate `h_cls` and `h_mean`
+- [x] use dual pooling
+- [x] concatenate `h_cls` and `h_mean`
 - [ ] freeze representation choice before ablations
 
 ### Heads
 #### Required heads
-- [ ] binary head
-- [ ] family head
+- [x] binary head
+- [x] family head
 
 #### Optional auxiliary heads
-- [ ] protocol head
-- [ ] L7 protocol head
-- [ ] dst-port head
-- [ ] src-port head
-- [ ] bytes head
-- [ ] packets head
+- [x] protocol head
+- [x] L7 protocol head
+- [x] dst-port head
+- [x] src-port head
+- [x] bytes head
+- [x] packets head
 
 ### Rule
 - [ ] auxiliary heads must not become the thesis story
 - [ ] if auxiliaries are used, test whether they help or hurt the main targets
+
+> [!warning]
+> Baseline 1 currently includes optional auxiliary heads in the implementation and config. That is okay, but the final thesis story still has to stay centered on:
+> - binary malicious detection
+> - coarse attack-family classification
 
 ---
 
@@ -206,28 +232,40 @@ Make the representation choice explicit and frozen.
 Use a strong training recipe without hidden confounds.
 
 ### Checklist
-- [ ] choose one optimizer family
-- [ ] freeze LR schedule
-- [ ] use gradient clipping
+- [x] choose one optimizer family
+- [x] freeze LR schedule
+- [x] use gradient clipping
 - [ ] decide whether EMA is on
-- [ ] fix epoch budget
-- [ ] fix batch size
-- [ ] fix AMP policy
-- [ ] fix seed set
-- [ ] log train and val curves every epoch
-- [ ] save best checkpoint by validation metric
-- [ ] also save final checkpoint
+- [x] fix epoch budget
+- [x] fix batch size
+- [x] fix AMP policy
+- [x] fix seed set
+- [x] log train and val curves every epoch
+- [x] save best checkpoint by validation metric
+- [x] also save final checkpoint
 
 ### Loss stack
-- [ ] binary loss fixed
-- [ ] family loss fixed
-- [ ] auxiliary categorical loss fixed if used
-- [ ] auxiliary numeric loss fixed if used
-- [ ] loss weights fixed before main comparisons
+- [x] binary loss fixed
+- [x] family loss fixed
+- [x] auxiliary categorical loss fixed if used
+- [x] auxiliary numeric loss fixed if used
+- [x] loss weights fixed before main comparisons
 
 ### Important
 - [ ] Baseline 1 should not win because of a secret recipe change
 - [ ] training choices must be recorded well enough to reproduce exactly
+
+> [!note]
+> Current recipe pieces implemented:
+> - AdamW
+> - scheduler support
+> - AMP support
+> - gradient clipping
+> - fixed loss weights from config
+> - checkpointing
+> - train / val loop
+>
+> EMA has not been added yet, which is fine if you decide Baseline 1 does not use EMA and freeze that choice.
 
 ---
 
@@ -244,7 +282,7 @@ Evaluate Baseline 1 in a thesis-safe way.
 
 ### Operational metrics
 - [ ] low-FPR behaviour
-- [ ] confusion matrix by family
+- [x] confusion matrix by family
 - [ ] calibration:
   - [ ] ECE
   - [ ] Brier
@@ -264,6 +302,18 @@ Evaluate Baseline 1 in a thesis-safe way.
 - [ ] calibration table
 - [ ] cost table
 - [ ] per-family error table
+
+> [!note]
+> Current evaluation / reporting already includes:
+> - total loss
+> - binary accuracy
+> - family accuracy
+> - binary confusion matrix
+> - family confusion matrix
+> - saved plots
+> - saved summary
+>
+> The thesis-safe metric stack still needs the more important research metrics added explicitly.
 
 ---
 
@@ -311,21 +361,21 @@ Show what actually makes FlowTransformer++ work.
 # 12. Negative-result policy for Baseline 1
 
 ## Pre-register this now
-- [ ] if Baseline 1 is unstable, fix the recipe before inventing a fancier model
-- [ ] if Baseline 1 does not hold up across seeds or stress splits, report that honestly
-- [ ] do not use a weaker Transformer setup just to make a future model look better
+- [x] if Baseline 1 is unstable, fix the recipe before inventing a fancier model
+- [x] if Baseline 1 does not hold up across seeds or stress splits, report that honestly
+- [x] do not use a weaker Transformer setup just to make a future model look better
 
 ---
 
 # 13. Recommended build order for Baseline 1
 
 ## Practical sequence
-1. [ ] dataset card + feature freeze
-2. [ ] leakage audit
-3. [ ] window builder
+1. [x] dataset card + feature freeze
+2. [x] leakage audit
+3. [x] window builder
 4. [ ] split freeze
-5. [ ] architecture freeze
-6. [ ] training recipe freeze
+5. [x] architecture implementation
+6. [x] training recipe implementation
 7. [ ] first stable training run
 8. [ ] multi-seed run
 9. [ ] calibration + stress split
