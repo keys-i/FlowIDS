@@ -45,7 +45,35 @@ num_layers = 6
 dim_feedforward = 1024
 dropout = 0.1
 
+[model.aux_class_dims]
+protocol = 256
+l7_proto = 256
+src_port = 65538
+dst_port = 65538
+
+[model.aux_reg_dims]
+bytes = 2
+pkts = 2
+
+[model.aux_gaussian_dims]
+
 [train]
 epochs = 10
 lr = 1e-4
 weight_decay = 1e-2
+amp = true
+grad_clip_norm = 1.0
+
+[train.loss_weights]
+binary = 1.0
+family = 1.0
+protocol = 0.2
+l7_proto = 0.2
+src_port = 0.1
+dst_port = 0.1
+bytes = 0.2
+pkts = 0.2
+
+[train.scheduler]
+name = "cosine"
+t_max = 10
