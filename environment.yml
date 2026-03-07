@@ -1,13 +1,13 @@
 name: flowIDS
+
 channels:
   - conda-forge
+
 dependencies:
   - python
   - pip
   - setuptools
   - wheel
-  - polars
-  - pyarrow
-  - matplotlib
-  - click
-  - rich
+  - pip:
+      - -r deps/requirements.txt
+      - -r deps/requirements.dev.txt
