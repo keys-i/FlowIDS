@@ -28,6 +28,7 @@ torch.backends.cudnn.deterministic = False
 
 to_dict = lambda typ, section: {key: typ(value) for key, value in vars(section).items()}
 
+
 def build_scheduler(optimizer: Optimizer, scheduler_cfg):
     """Create the configured learning-rate scheduler"""
     name = str(scheduler_cfg.name).lower()
@@ -50,6 +51,7 @@ def build_scheduler(optimizer: Optimizer, scheduler_cfg):
             )
         case _:
             raise ValueError(f"Unsupported scheduler name: {name}.")
+
 
 # Load config
 config = load_config("config.toml")
@@ -178,9 +180,9 @@ val batches: {len(val_dl)}
 test batches: {len(test_dl)}
 optimizer: {optimizer.__class__.__name__}
 epochs: {epochs}
-best epoch: {summary['best_epoch']}
-test total loss: {evaluation['total_loss']:.4f}
-test binary acc: {evaluation['binary_acc']:.4f}
-test family acc: {evaluation['family_acc']:.4f}
+best epoch: {summary["best_epoch"]}
+test total loss: {evaluation["total_loss"]:.4f}
+test binary acc: {evaluation["binary_acc"]:.4f}
+test family acc: {evaluation["family_acc"]:.4f}
 summary: {summary_path}"""
 )

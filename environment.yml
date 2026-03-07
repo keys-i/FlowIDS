@@ -8,15 +8,6 @@ dependencies:
   - pip
   - setuptools
   - wheel
-  - ipykernel
-  # dependencies
-  - polars
-  - scikit-learn
-  - pyarrow
-  - matplotlib
-  - pytorch
-  - huggingface_hub
-  # dev dependencies
-  - tqdm
-  - click
-  - rich
+  - pip:
+      - -r deps/requirements.txt
+      - -r deps/requirements.dev.txt
