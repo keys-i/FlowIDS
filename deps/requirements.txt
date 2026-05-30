@@ -1,7 +1,0 @@
-polars
-scikit-learn
-pyarrow
-matplotlib
-torch
-huggingface_hub
-tqdm

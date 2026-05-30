@@ -1,0 +1,35 @@
+[workspace]
+name = "flowids"
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-arm64"]
+
+[dependencies]
+python = "3.13.*"
+click = "*"
+duckdb-cli = "1.5.*"
+huggingface_hub = "*"
+matplotlib = "*"
+polars = "*"
+pyarrow = "*"
+pytorch = "*"
+rich = "*"
+scikit-learn = "*"
+tqdm = "*"
+
+[tasks]
+convert = "python tools/scripts/convert.py"
+
+[feature.dev.dependencies]
+basedpyright = "*"
+ipykernel = "*"
+ruff = "0.16.*"
+
+[feature.dev.tasks]
+lint = "ruff check . --config tools/configs/ruff.toml"
+format = "ruff format . --config tools/configs/ruff.toml"
+format-check = "ruff format --check . --config tools/configs/ruff.toml"
+typecheck = "basedpyright tools/scripts"
+check = { depends-on = ["lint", "format-check", "typecheck"] }
+
+[environments]
+dev = ["dev"]
