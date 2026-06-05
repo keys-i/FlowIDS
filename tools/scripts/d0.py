@@ -415,7 +415,7 @@ def _near_integer(raw: dict[str, object], field: str) -> int | None:
     return value
 
 
-def _lineage_key(secret: object, lineage_id: object) -> tuple[bytes, str]:
+def lineage_key(secret: object, lineage_id: object) -> tuple[bytes, str]:
     if not isinstance(secret, bytes) or len(secret) < 16:
         raise ValueError("routing secret must contain at least 16 bytes")
     if not isinstance(lineage_id, str) or not lineage_id.strip():
@@ -457,7 +457,7 @@ def routing_view(
     end = _routing_integer(raw, END)
     if end < start:
         raise ValueError("FLOW_END_MILLISECONDS must not precede FLOW_START_MILLISECONDS")
-    key, checked_lineage = _lineage_key(secret, lineage_id)
+    key, checked_lineage = lineage_key(secret, lineage_id)
     if not isinstance(observation_domain_id, str) or not observation_domain_id.strip():
         raise ValueError("observation_domain_id must be a non-empty string")
     source = _endpoint_key(raw.get("IPV4_SRC_ADDR"), key, "IPV4_SRC_ADDR")

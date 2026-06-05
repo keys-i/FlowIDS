@@ -20,7 +20,7 @@ class SplitRow:
     """Routing metadata only; canonical_family is forbidden from model and SSL inputs."""
 
     event_id: str
-    completion_ms: int
+    partition_time_ms: int
     source_principal: str
     destination_principal: str
     source_unit_id: str
@@ -60,8 +60,8 @@ def _integer(name: str, value: object) -> int:
 
 def _validate_row(row: SplitRow) -> None:
     _require_identifier("event_id", row.event_id)
-    if _integer("completion_ms", row.completion_ms) < 0:
-        raise ValueError("completion_ms must be non-negative")
+    if _integer("partition_time_ms", row.partition_time_ms) < 0:
+        raise ValueError("partition_time_ms must be non-negative")
     for name, value in (
         ("source_unit_id", row.source_unit_id),
         ("capture_lineage_id", row.capture_lineage_id),
@@ -156,15 +156,15 @@ def _partition(row: SplitRow, spec: SplitSpec) -> tuple[str | None, tuple[str, .
     if spec.track == "chronological":
         assert spec.train_end_ms is not None and spec.validation_end_ms is not None
         reasons: list[str] = []
-        if abs(row.completion_ms - spec.train_end_ms) <= spec.purge_ms:
+        if abs(row.partition_time_ms - spec.train_end_ms) <= spec.purge_ms:
             reasons.append("purge:train_cutoff")
-        if abs(row.completion_ms - spec.validation_end_ms) <= spec.purge_ms:
+        if abs(row.partition_time_ms - spec.validation_end_ms) <= spec.purge_ms:
             reasons.append("purge:validation_cutoff")
         if reasons:
             return None, tuple(reasons)
-        if row.completion_ms < spec.train_end_ms:
+        if row.partition_time_ms < spec.train_end_ms:
             return "train", ()
-        if row.completion_ms < spec.validation_end_ms:
+        if row.partition_time_ms < spec.validation_end_ms:
             return "validation", ()
         return "test", ()
     if spec.track == "endpoint_disjoint":
@@ -190,6 +190,13 @@ def _partition(row: SplitRow, spec: SplitSpec) -> tuple[str | None, tuple[str, .
     return None, ("excluded:unassigned_source_unit",)
 
 
+def partition_row(row: SplitRow, spec: SplitSpec) -> tuple[str | None, tuple[str, ...]]:
+    """Validate and partition one routing row under the frozen split contract."""
+    _validate_spec(spec)
+    _validate_row(row)
+    return _partition(row, spec)
+
+
 def _isolation_groups(row: SplitRow, spec: SplitSpec) -> tuple[tuple[str, str], ...]:
     groups = [("exact", row.exact_group), ("near", row.near_group)]
     if spec.track == "held_out_family" and row.campaign_id is not None:
@@ -202,7 +209,7 @@ def _isolation_groups(row: SplitRow, spec: SplitSpec) -> tuple[tuple[str, str], 
 def _row_json(row: SplitRow, partition: str, pretraining_visible: bool) -> dict[str, object]:
     return {
         "event_id": row.event_id,
-        "completion_ms": row.completion_ms,
+        "partition_time_ms": row.partition_time_ms,
         "partition": partition,
         "pretraining_visible": pretraining_visible,
         "source_unit_id": row.source_unit_id,
@@ -274,7 +281,7 @@ def _assignment(value: object) -> tuple[SplitRow, str, bool]:
     assignment = cast(dict[str, object], value)
     required = (
         "event_id",
-        "completion_ms",
+        "partition_time_ms",
         "partition",
         "pretraining_visible",
         "source_unit_id",
@@ -310,7 +317,9 @@ def _assignment(value: object) -> tuple[SplitRow, str, bool]:
     return (
         SplitRow(
             event_id=cast(str, assignment["event_id"]),
-            completion_ms=_integer("split assignment completion_ms", assignment["completion_ms"]),
+            partition_time_ms=_integer(
+                "split assignment partition_time_ms", assignment["partition_time_ms"]
+            ),
             source_principal=cast(str, assignment["source_principal"]),
             destination_principal=cast(str, assignment["destination_principal"]),
             source_unit_id=cast(str, assignment["source_unit_id"]),

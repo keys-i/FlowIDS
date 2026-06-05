@@ -88,7 +88,11 @@ class ReleaseCheckTest(unittest.TestCase):
                         b'"FLOW_START_MILLISECONDS", "flow_available_ms", '
                         b'"end_reason", "completion_ms", "scenario_id"]}'
                     ),
-                    "flowids/run-manifest.json": b'{"source_key": "opaque", "event_id": "private"}',
+                    "flowids/run-manifest.json": (
+                        b'{"source_key": "opaque", "event_id": "private", '
+                        b'"source_principal": "anon:x", "destination_principal": "anon:y", '
+                        b'"partition_time_ms": 1, "pretraining_visible": true}'
+                    ),
                 },
             )
         )
@@ -102,8 +106,24 @@ class ReleaseCheckTest(unittest.TestCase):
                 ("flowids/model-schema.json", "forbidden schema field: scenario_id"),
                 ("flowids/model-schema.json", "forbidden schema field: src_ip"),
                 ("flowids/model-schema.json", "forbidden schema field: target"),
+                (
+                    "flowids/run-manifest.json",
+                    "forbidden schema field: destination_principal",
+                ),
                 ("flowids/run-manifest.json", "forbidden schema field: event_id"),
+                (
+                    "flowids/run-manifest.json",
+                    "forbidden schema field: partition_time_ms",
+                ),
+                (
+                    "flowids/run-manifest.json",
+                    "forbidden schema field: pretraining_visible",
+                ),
                 ("flowids/run-manifest.json", "forbidden schema field: source_key"),
+                (
+                    "flowids/run-manifest.json",
+                    "forbidden schema field: source_principal",
+                ),
             ],
         )
 

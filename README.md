@@ -79,5 +79,36 @@ performance target. Q1 is a source-quality decision only: model-ladder D0
 remains blocked until a frozen split, train-only fit, and causal state replay
 also pass.
 
+Freeze the local chronological split with an owner-only 32-byte routing key:
+
+```bash
+pixi run mawi-split -- \
+  --config tools/configs/mawi.json \
+  --source-receipt data/work/mawi/samplepoint-f/2006/200608241400/mawi-q1.receipt.json \
+  --source-parquet data/work/mawi/samplepoint-f/2006/200608241400/mawi-q1.parquet \
+  --secret-file /path/to/owner-only-32-byte-key \
+  --train-end-ms 1156395900794 \
+  --validation-end-ms 1156396200794 \
+  --purge-ms 60000 \
+  --sidecar data/evidence/mawi-q1-split.parquet \
+  --receipt data/evidence/mawi-q1-split.receipt.json
+```
+
+The cutoffs are fixed at five and ten minutes after capture start. Partitioning
+uses flow availability, not last-packet time. Most timeout-ended records share
+the conservative capture-end bound, so this artifact proves local split
+plumbing only; it cannot support a chronological-generalisation or IDS claim.
+Both outputs contain endpoint-derived HMAC identifiers and remain local. D0
+stays blocked until train-only fitting, semantic-context diagnostics and
+partition-reset causal replay pass.
+
+The full local split retained 824,972 of 853,869 flows after the fixed boundary
+purges: 29,840 train, 21,615 validation and 773,517 test. The final block
+contains one 743,518-row capture-end availability tie, which is why it is not a
+temporal-generalisation benchmark. The 105,980,661-byte sidecar has SHA-256
+`e15a0295b8aef9e3a932a47a5597d6b355ead899ded431069b7a623e8045f742`;
+two byte-identical replays took 25.72--26.23 seconds with at most
+1,220,460,544 bytes peak resident memory on the recorded machine.
+
 Tagged releases run `pixi run release-check` against the generated archive and
 refuse data, evidence, secrets, or model schemas containing forbidden fields.

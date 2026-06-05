@@ -6,13 +6,13 @@ from tools.scripts import splits
 
 def row(
     event_id: str,
-    completion_ms: int,
+    partition_time_ms: int,
     suffix: str,
     **changes: object,
 ) -> splits.SplitRow:
     value = splits.SplitRow(
         event_id=event_id,
-        completion_ms=completion_ms,
+        partition_time_ms=partition_time_ms,
         source_principal=f"anon:source-{suffix}",
         destination_principal=f"anon:destination-{suffix}",
         source_unit_id=f"unit-{suffix}",
@@ -33,7 +33,13 @@ class TrackSpecificSplitTest(unittest.TestCase):
             row("validation", 15, "b", **recurring),
             row("test", 25, "c", **recurring),
         ]
-        spec = splits.SplitSpec("chronological", train_end_ms=10, validation_end_ms=20)
+        spec = splits.SplitSpec(
+            "chronological",
+            train_end_ms=10,
+            validation_end_ms=20,
+        )
+
+        self.assertEqual(splits.partition_row(rows[0], spec), ("train", ()))
 
         forward = splits.build_split(rows, spec)
         reverse = splits.build_split(reversed(rows), spec)
@@ -41,6 +47,9 @@ class TrackSpecificSplitTest(unittest.TestCase):
         self.assertEqual(forward, reverse)
         self.assertEqual(forward["retained_counts"], {"test": 1, "train": 1, "validation": 1})
         self.assertEqual(forward["dropped"], [])
+        self.assertTrue(
+            all("partition_time_ms" in assignment for assignment in forward["assignments"])
+        )
         splits.validate_no_overlap(forward)
 
     def test_endpoint_holdout_purges_boundary_and_never_leaks_to_source(self) -> None:
@@ -158,7 +167,11 @@ class TrackSpecificSplitTest(unittest.TestCase):
             )
 
     def test_duplicate_rejected_and_exact_near_overlaps_removed(self) -> None:
-        spec = splits.SplitSpec("chronological", train_end_ms=10, validation_end_ms=20)
+        spec = splits.SplitSpec(
+            "chronological",
+            train_end_ms=10,
+            validation_end_ms=20,
+        )
         with self.assertRaisesRegex(ValueError, "duplicate"):
             splits.build_split([row("duplicate", 1, "a"), row("duplicate", 2, "b")], spec)
         rows = [
@@ -200,13 +213,21 @@ class TrackSpecificSplitTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "required partitions are empty"):
             splits.build_split(
                 [row("train", 1, "a")],
-                splits.SplitSpec("chronological", train_end_ms=10, validation_end_ms=20),
+                splits.SplitSpec(
+                    "chronological",
+                    train_end_ms=10,
+                    validation_end_ms=20,
+                ),
             )
         raw = row("raw", 1, "raw", source_principal="192.0.2.1")
         with self.assertRaisesRegex(ValueError, "opaque anon"):
             splits.build_split(
                 [raw],
-                splits.SplitSpec("chronological", train_end_ms=10, validation_end_ms=20),
+                splits.SplitSpec(
+                    "chronological",
+                    train_end_ms=10,
+                    validation_end_ms=20,
+                ),
             )
 
 

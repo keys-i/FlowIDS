@@ -519,13 +519,13 @@ def _canonical(
     )
 
 
-def _temp(parent: Path, suffix: str) -> Path:
+def temporary_file(parent: Path, suffix: str) -> Path:
     descriptor, name = tempfile.mkstemp(prefix=".mawi.", suffix=suffix, dir=parent)
     os.close(descriptor)
     return Path(name)
 
 
-def _publish(
+def publish_bundle(
     temporary_parquet: Path,
     receipt_payload: bytes,
     parquet: Path,
@@ -556,7 +556,7 @@ def _publish(
                 raise ValueError("existing MAWI Parquet differs; refusing overwrite") from error
     if temporary_parquet.exists():
         temporary_parquet.unlink()
-    temporary_receipt = _temp(receipt.parent, ".json")
+    temporary_receipt = temporary_file(receipt.parent, ".json")
     try:
         with temporary_receipt.open("wb") as handle:
             _ = handle.write(receipt_payload)
@@ -745,7 +745,7 @@ def materialize(
         raise ValueError("outputs must be distinct from source artifacts and each other")
     parquet.parent.mkdir(parents=True, exist_ok=True)
     receipt.parent.mkdir(parents=True, exist_ok=True)
-    canonical = _temp(parquet.parent, ".csv")
+    canonical = temporary_file(parquet.parent, ".csv")
     temporary_parquet: Path | None = None
     try:
         counts = {key: 0 for key in FLOW_KEYS}
@@ -773,7 +773,7 @@ def materialize(
         _exact(expected_flows, counts, "expected_flows")
         if counts["accepted"] == 0:
             raise ValueError("no completed YAF flows remain after censoring")
-        temporary_parquet = _temp(parquet.parent, ".parquet")
+        temporary_parquet = temporary_file(parquet.parent, ".parquet")
         pl.scan_csv(canonical, schema=SCHEMA).sort(
             ["flow_available_ms", "flow_end_ms", "flow_start_ms", *OUTPUT_COLUMNS[4:]]
         ).sink_parquet(temporary_parquet, compression="zstd")
@@ -856,7 +856,7 @@ def materialize(
         }
         receipt_payload = (json.dumps(payload, indent=2, sort_keys=True) + "\n").encode()
         try:
-            _publish(temporary_parquet, receipt_payload, parquet, receipt)
+            publish_bundle(temporary_parquet, receipt_payload, parquet, receipt)
             temporary_parquet = None
         except OSError as error:
             raise ValueError(f"cannot publish MAWI artifact bundle: {error}") from error
@@ -877,7 +877,7 @@ def _json(path: Path, name: str) -> Mapping[str, object]:
     return cast(Mapping[str, object], value)
 
 
-def _config(path: Path) -> tuple[Path, Mapping[str, object]]:
+def load_config(path: Path) -> tuple[Path, Mapping[str, object]]:
     path = _regular(path, "--config")
     config = _json(path, "--config")
     if set(config) != set(CONFIG_KEYS) or config.get("schema_version") != 1:
@@ -937,7 +937,7 @@ def main(
 ) -> None:
     """Materialise one verified MAWI capture; no training eligibility is granted."""
     try:
-        config_path, values = _config(config)
+        config_path, values = load_config(config)
         source = cast(Mapping[str, object], values["source"])
         meter = cast(Mapping[str, object], values["meter"])
         archive = _regular(archive, "--archive")

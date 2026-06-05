@@ -20,6 +20,7 @@ tqdm = "*"
 convert = "python tools/scripts/convert.py"
 d0 = "python tools/scripts/d0.py"
 mawi = "python tools/scripts/mawi.py"
+mawi-split = "python -m tools.scripts.mawi_split"
 release-check = "python tools/scripts/release_check.py"
 
 [feature.dev.dependencies]
