@@ -78,7 +78,7 @@ SELECT data_file, completion_day, flows, sum(flows) OVER (PARTITION BY data_file
 FROM daily
 ORDER BY data_file, completion_day;
 
--- DIAGNOSTIC ONLY (never a D0 gate): strict, label-blind raw-field keys.
+-- Strict, label-blind raw-field duplicate check.
 -- `data_file` is only a lineage/observation-domain proxy; the result is not
 -- equivalent to NF3-v1 until that one-file/one-domain assumption is verified.
 -- `occurrences` retains row multiplicity rather than deduplicating it.
@@ -142,7 +142,7 @@ FROM sources
 LEFT JOIN summary USING (data_file)
 ORDER BY sources.data_file;
 
--- DIAGNOSTIC ONLY (never a D0 gate): ordered-adjacency ±1ms lower bound.
+-- Ordered-adjacency ±1ms lower bound for near-duplicate inspection.
 -- It does not enumerate every qualifying pair. Even this lower bound exhibits
 -- transitive bridges, so fuzzy connected components are rejected. DuckDB hash
 -- is an exploratory tie-breaker only, not a portable ID.

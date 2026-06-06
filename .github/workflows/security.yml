@@ -3,7 +3,19 @@ name: Security
 on:
   push:
     branches: [main, master]
+    paths:
+      - ".github/workflows/security.yml"
+      - "pixi.lock"
+      - "pixi.toml"
+      - "src/**/*.py"
+      - "tools/scripts/**/*.py"
   pull_request:
+    paths:
+      - ".github/workflows/security.yml"
+      - "pixi.lock"
+      - "pixi.toml"
+      - "src/**/*.py"
+      - "tools/scripts/**/*.py"
   schedule:
     - cron: "17 3 * * 1"
 
