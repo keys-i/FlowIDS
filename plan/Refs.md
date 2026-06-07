@@ -613,114 +613,14 @@ adjacent foundation-model domain. It does not define traffic equivalence;
 exact and near-duplicate NetFlow keys must still be specified and audited
 before split assignment.
 
-## Duplicate grouping evidence
-
-### NF3SchemaAndTimestamps
-
-M. Luay *et al.*, “Temporal Analysis of NetFlow Datasets for Network Intrusion
-Detection Systems,” arXiv:2503.04404v2, 2025,
-https://arxiv.org/abs/2503.04404; University of Queensland, “NetFlow Datasets,”
-official collection: https://staff.itee.uq.edu.au/marius/NIDS_datasets/. Imported
-evidence: the v3 lineage supplies a documented UQ conversion/schema and temporal
-features, including timestamps, for the four releases recorded in
-[NF3Temporal](#nf3temporal). Limitation: this establishes neither that two
-exports share a meter/configuration nor a semantic equivalence rule; use the
-released schema and acquired-file manifest, never a local audit result, as the
-source record.
-
-### IPFIXSemantics
-
-B. Claise *et al.*, “Specification of the IP Flow Information Export (IPFIX)
-Protocol for the Exchange of Flow Information,” RFC 7011, 2013,
-https://doi.org/10.17487/RFC7011; IANA, “IPFIX Information Elements,”
-https://www.iana.org/assignments/ipfix/ipfix.xhtml. Imported evidence: an IPFIX
-flow is packets sharing properties at an Observation Point during an interval;
-the normative registry defines `flowStartMilliseconds` and
-`flowEndMilliseconds` as the first- and last-packet timestamps. Limitation:
-those fields describe an exported meter record, while Message Header Export Time
-is message time; they do not prove a capture-global session identity or an
-inter-export duplicate relation.
-
-### NProbeTimeouts
-
-ntop, “nProbe 10.0 Command Line Options,” official documentation,
-https://www.ntop.org/guides/nprobe/cli_options.html. Imported evidence:
-`%FLOW_ACTIVE_TIMEOUT` and `%FLOW_INACTIVE_TIMEOUT` are the activity and
-inactivity timeouts of flow-cache entries. Limitation: this documents cache
-expiration controls, not a stable identity or calibrated equivalence across
-independent exports; active/idle settings and version remain manifest fields.
-
-### CanonicalHashes
-
-A. Rundgren *et al.*, “JSON Canonicalization Scheme (JCS),” RFC 8785, 2020,
-https://doi.org/10.17487/RFC8785; NIST, “Secure Hash Standard (SHS),” FIPS
-PUB 180-4, 2015, https://doi.org/10.6028/NIST.FIPS.180-4; H. Krawczyk,
-M. Bellare, and R. Canetti, “HMAC: Keyed-Hashing for Message Authentication,”
-RFC 2104, 1997, https://doi.org/10.17487/RFC2104. Imported evidence: JCS gives
-deterministic JSON serialization for repeatable hashing; FIPS 180-4 specifies
-the SHA family; HMAC combines an iterated hash with a secret key. Limitation:
-canonical bytes plus a lineage-scoped HMAC-SHA-256 establish exact-record
-equality without persisting an endpoint-bearing plaintext digest; keyed hashes
-are routing/grouping tokens, not anonymous semantics or a near-duplicate test.
-
-## Context similarity evidence
-
-### Broder1997
-
-A. Z. Broder, “On the Resemblance and Containment of Documents,” *Compression
-and Complexity of Sequences*, 1997,
-https://doi.org/10.1109/SEQUEN.1997.666900. It defines a document as a canonical
-token sequence, forms contiguous w-shingles, and expresses resemblance as set
-intersection/union (Jaccard). Imported evidence: an explicit, fixed tokenization
-and threshold can define syntactic near-duplicates. Limitation: it supplies no
-traffic-field semantics or calibrated threshold.
-
-### PPJoinPlus
-
-C. Xiao, W. Wang, X. Lin, J. X. Yu, and G. Wang, “Efficient Similarity Joins
-for Near-Duplicate Detection,” *ACM Transactions on Database Systems*, vol. 36,
-no. 3, art. 15, 2011, https://doi.org/10.1145/2000824.2000825. PPJoin+ uses
-filters followed by verification to return record pairs whose set similarity is
-at least a stated threshold. Imported evidence: an exact threshold join is a
-valid candidate-generation implementation after the traffic token set and
-threshold are frozen. Limitation: exactness is relative to that syntactic set
-predicate, not semantic context.
-
-### SparkMinHashLSH
-
-Apache Spark, “MinHash for Jaccard Distance,” official ML documentation,
-https://spark.apache.org/docs/latest/ml-features.html#minhash-for-jaccard-distance.
-Spark labels its similarity joins and nearest-neighbour search approximate and
-defines false negatives as nearby features sent to different buckets. Imported
-evidence: MinHashLSH may accelerate candidate generation only. Limitation: it
-cannot certify zero cross-partition near-duplicate overlap without an exact
-verification pass.
-
-### Charikar2002
-
-M. S. Charikar, “Similarity Estimation Techniques from Rounding Algorithms,”
-*STOC 2002*, pp. 380–388, https://doi.org/10.1145/509907.509965. Its random
-hyperplane family estimates angular/cosine similarity through hash-collision
-probability. Limitation: SimHash/Hamming distance is not a Jaccard or semantic
-context guarantee, so it is not an isolation gate here.
-
-### ContextIsolationDecision
-
-Imported evidence supports exact-record hashing and explicitly parameterized
-syntactic near-duplicate grouping only. Semantic-context hard isolation is
-rejected absent calibrated repeat-export pairs with a predeclared equivalence
-rule and error assessment; exact context hashes are diagnostic/replay evidence
-only, not semantic grouping or a zero-overlap gate. No local uncommitted
-measurement is literature evidence.
-
 ### ComputeScaling
 
 J. Kaplan *et al.*, “Scaling Laws for Neural Language Models,” arXiv:2001.08361,
 2020, https://arxiv.org/abs/2001.08361. J. Hoffmann *et al.*, “Training
 Compute-Optimal Large Language Models,” arXiv:2203.15556, 2022,
 https://arxiv.org/abs/2203.15556. These motivate measured data/model scaling;
-they do not prove network-traffic scaling. Report unique flows, provenance
-units, exposures, hardware, FLOPs, and transfer—not pretraining loss alone.
+they do not prove network-traffic scaling. Report unique flows, exposures,
+hardware, FLOPs, and transfer—not pretraining loss alone.
 
 ### NetBench
 
@@ -786,8 +686,10 @@ University of Queensland, “NetFlow Datasets,” official collection:
 https://staff.itee.uq.edu.au/marius/NIDS_datasets/. This is the official release
 for the four v3 datasets identified in [NF3Temporal](#nf3temporal). There is no
 official merged `NF-UQ-NIDS-v3`; `NF-UQ-NIDS-v2` is a distinct legacy
-collection. Archive each downloaded manifest, license, label definition,
-collection interval, and hash before use.
+collection. Project assumption: the supplied NF3 datasets are accepted
+benchmark inputs. Their controlled, converted lineage supports benchmark
+comparison, not claims about independent operational capture or deployment
+transfer.
 
 ### CTU13
 
@@ -803,9 +705,9 @@ from `Normal`; excluding Background from clean-benign fitting is a conservative
 project policy, not a property asserted by the dataset authors.
 The public scenario material does not establish one versioned schema across all
 scenarios, Argus version/timeouts, normalized timezone, a cryptographic release
-manifest, or explicit redistribution terms. The project's current Q0 verdict
-is an admission decision from those missing facts, not a claim that the traffic
-itself is unusable.
+record, or explicit redistribution terms. These limitations constrain
+cross-scenario and operational claims; they do not make the traffic unusable as
+a benchmark.
 
 ### CESNETTLSYear22
 
@@ -827,10 +729,9 @@ changed packet-sequence distributions.
 `CATEGORY` are label-bearing fields and must not be model inputs for that
 probe. Starts are clipped to the hour and ends are adjusted to preserve
 duration; records do not identify the contributing probe. Those facts block
-strict causal endpoint-history reconstruction, so the project treats this as
-Q0 for its causal ladder. The official Zenodo API records CC BY 4.0, but the
-downloaded release, advertised schema discrepancy around source ports/PPI, and
-selected dates still require audit before any non-causal diagnostic.
+strict causal endpoint-history reconstruction. The official Zenodo API records
+CC BY 4.0; the advertised schema discrepancy around source ports/PPI and the
+selected dates limit comparisons.
 
 ### CICIot2022
 
@@ -856,8 +757,7 @@ attacks are injected; June contains documented anomaly risk and is not assumed
 benign. The release exceeds 16.9 billion unidirectional NetFlow v9 records and
 publishes weekly nfcapd/CSV files, but the official sources do not publish a
 licence, timezone, per-record collector identity, or cryptographic release
-manifest. Therefore it is currently Q0 under this project's contract; archive
-and resolve those facts before use.
+record. These gaps limit strict chronology and collector-specific claims.
 
 ### LITNET2020
 
@@ -869,8 +769,8 @@ https://doi.org/10.3390/electronics9050800. Official data:
 https://dataset.litnet.lt/data.php. The authors report 85 features and 12
 attack types across 45,330,333 academic-network flows. Published material does
 not resolve exporter version/timeouts, timezone, bidirectional completion,
-formal redistribution terms, or release hashes. It is currently Q0; downloaded
-schema, label rules, chronology, and split suitability still require audit.
+formal redistribution terms, or release hashes. Downloaded schema, label rules,
+chronology, and split suitability are not established by the published material.
 
 ### CICDocs
 
@@ -889,9 +789,9 @@ clearly granted. Samplepoint-F provides timestamped, anonymized backbone PCAP,
 but endpoint mappings for ordinary daily traces are stable only within one
 trace, timestamps have NTP/commodity-capture limitations, and mirrored traffic
 may be incomplete or asymmetric. A frozen local PCAP-to-bidirectional-flow
-conversion with input/tool/config hashes and packet accounting is a plausible
-Q1 route; until that evidence exists it remains Q0. Selected traces may then
-support unlabeled SSL, drift, or alert-volume analysis, not IDS ground truth.
+conversion cannot establish stable cross-trace endpoint identity from the
+published material. The traces may support exploration, unlabeled SSL, drift,
+or alert-volume analysis, not IDS ground truth.
 MAWILab is
 a separate anomaly-label service for MAWI samplepoints B and F: R. Fontugne,
 P. Borgnat, P. Abry, and K. Fukuda, “MAWILab: Combining diverse anomaly

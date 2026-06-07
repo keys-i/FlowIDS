@@ -3,9 +3,10 @@
 ## Scope and decision boundary
 
 This file owns model comparisons, objectives, promotion, collapse, and scaling.
-The portable feature view, causal-state invariants, and runtime contract are in
-[Architecture](Architecture.md); claims, data eligibility, splits, task tracks,
-metrics, and operational, versatility, and resource gates are in
+The feature view and causal-context contract are in
+[Architecture](Architecture.md#prediction-unit-and-feature-view) and
+[Architecture](Architecture.md#context-and-relations); claims, task
+tracks, metrics, and operational, versatility, and resource gates are in
 [Thesis](Thesis.md); prior-art and reproducibility evidence are in
 [Refs](Refs.md#prior-art-and-reproduction-boundaries).
 
@@ -18,6 +19,9 @@ architecture and window choices inside the new harness and label the result
 `historical-recreation`; do not restore its data, feature, label, or split
 pipeline. Use the frozen evaluation contract in
 [Thesis](Thesis.md#evaluation-and-leakage-contract).
+
+A benchmark result is limited to that benchmark. Only the frozen external
+transfer evaluation can support a transfer claim.
 
 ## Locked deployable backbone
 
@@ -38,7 +42,7 @@ predictors, and EMA copies are removed at inference; their training FLOPs and
 memory are reported. A bidirectional model is an offline upper bound, never a
 deployable equivalent.
 
-One source-validation search selects, then freezes: context horizon {1, 10,
+One development-data search selects, then freezes: context horizon {1, 10,
 60} minutes; learning rate {1e-4, 3e-4}; weight decay {0.01, 0.05}; and
 dropout {0, 0.1}. No test-visible or rung-specific expansion is permitted.
 Use AdamW, gradient clipping at 1.0, 5% linear warm-up, then cosine decay.
@@ -61,7 +65,7 @@ confirmed at S1 before any claim.
 ## Objectives and objective controls
 
 Use exactly the five semantic groups and target exclusions in
-[Architecture](Architecture.md#causal-context-and-tensors).
+[Architecture](Architecture.md#context-and-relations).
 
 For each causal sequence, select 30% of event/group units in contiguous spans
 of mean length three; replace the whole selected group with its learned group
@@ -121,7 +125,7 @@ and unreproducible models remain literature comparisons. YaTC and exact MMAE
 are packet-view upper bounds only on a paired subset; they are not NetFlow
 competitors. The YaTC packet teacher is eligible for X1-Distill only after the paired
 data and refreshed-novelty gates in
-[Architecture](Architecture.md#conditional-packet-teacher-x1-distill).
+[Architecture](Architecture.md#optional-extensions).
 
 Matched mechanism controls are deliberate and named. MMAE-NF is a 25M NetFlow
 adaptation, not a reproduction: map each semantic group to a patch unit and use
@@ -138,8 +142,8 @@ claimed overlap are governed by
 
 | Rung | Sole promoted difference | Required evidence | Immediate rejection |
 |---|---|---|---|
-| D0 | No model | Data/split eligibility passes [Architecture](Architecture.md#d0-acceptance-evidence) and [Thesis](Thesis.md#evaluation-and-leakage-contract). | Stop the claim-bearing ladder if lineage, chronology, or leakage evidence is unresolved; any Q0 work remains an outside-ladder benchmark only. |
-| M0 | 25M backbone trained only on labels | Establish reference versus every applicable classical control. | If it fails the [classical-parity gate](#classical-parity-discriminator), permit only that restricted S0 discriminator; do not scale. |
+| Exploration | No model | Use the existing DuckDB queries to inspect schema, distributions, usable features, and leakage risks. This [exploration](Architecture.md#exploration) is enough before M0. | Do not train on a dataset or field that fails basic inspection. Exploration is not promotion evidence. |
+| M0 | 25M backbone trained only on labels | Before training, [build the actual splits, train-only preprocessing, and causal-context checks under `src`](Architecture.md#m0-implementation); then establish the reference versus every applicable classical control. | If it fails the [classical-parity gate](#classical-parity-discriminator), permit only that restricted S0 discriminator; do not scale. |
 | M1-R | L_raw pretraining on flat causal contexts | Pass the common frozen promotion gate below against random-init M0. | Reject if gain needs identifiers or ports, vanishes chronologically, or is in-domain only. |
 | M1-L | L_latent instead of raw; parallel constituent | Pass collapse screen and beat M0 in the separate exposure-matched and FLOP-matched comparisons. | Reject if raw matches it or teacher/student collapse persists. |
 | M2-H | Add the other constituent: L_raw + L_latent | Beat M1-R and M1-L, not merely M0, under exposure and FLOP matching. | Reject if either constituent or MMAE-NF matches it. |
@@ -147,7 +151,7 @@ claimed overlap are governed by
 | M3-Ego | Replace flat history with causal endpoint-ego history | Positive context main effect and positive hybrid×ego interaction. | Reject if random, time/feature-matched, or CMES grouping matches it. |
 | M4-Rel | Add directed identity-free endpoint relation bias | Beat no-bias and CMES-Causal; pass relation destruction and endpoint-renaming tests. | Reject if identity is required, relation is unused, or endpoint-held-out performance falls. |
 | M5-Hier | Conditional multi-resolution summaries | Run only if ≥20% valid contexts truncate at 256 and long-horizon recall is deficient; beat non-hierarchical M4-Rel on identical ego history within Thesis resource gates. | Reject if non-hierarchical M4-Rel matches it or runtime cost fails its gate. |
-| X1-Distill | Conditional frozen YaTC/packet teacher to flow student | Leakage-safe paired data, refreshed novelty search, and flow-only external gain over same-modality controls. | Reject if pairing/governance fails, packet alignment is shuffled-equivalent, or gain is <1 absolute AUPRC point. |
+| X1-Distill | Conditional frozen YaTC/packet teacher to flow student | Leakage-safe paired data, refreshed novelty search, and flow-only external gain over same-modality controls. | Reject if pairing/privacy fails, packet alignment is shuffled-equivalent, or gain is <1 absolute AUPRC point. |
 | Final | No mechanism | Five pretraining-seed replication on untouched domains/tasks. | Any primary failure narrows the claim. |
 
 ### Classical-parity discriminator
@@ -164,12 +168,12 @@ Under parity, run only three flat-context S0 arms—scratch, M1-R, and M1-L—at
 screening seeds and adaptation repeats from Thesis. Do not run hybrid, future,
 ego, relation, hierarchy, or scaling yet. Continue only if M1-R or M1-L beats
 both S0 scratch and the best classical model by the same AUPRC, confidence, and
-operational gates on at least two source-validation networks. Otherwise stop
+operational gates on at least two development networks. Otherwise stop
 all Transformer and SSL progression. If one constituent passes, complete the
 remaining standard S0 screen below before entering the 25M ladder.
 
 M3-Ego uses the context and matched-control definitions in
-[Architecture](Architecture.md#causal-context-and-tensors). Its controls are
+[Architecture](Architecture.md#context-and-relations). Its controls are
 flat collector history, same-size random earlier history,
 time-and-feature-matched history without a shared endpoint, target-only, CMES
 grouping. M4-Rel uses Architecture's anonymous relation tensor and causal-logit
@@ -181,7 +185,7 @@ test relation bias separately. Estimate
 (EgoHybrid − EgoScratch) − (FlatHybrid − FlatScratch). The proposed combined
 mechanism survives only if its paired block-bootstrap 95% lower bound is above
 zero on the predeclared low-label cross-domain aggregate. Non-canonical
-alternatives and their admission rules are fixed in
+alternatives and their comparison rules are fixed in
 [Thesis](Thesis.md#excluded-or-conditional-alternatives).
 
 ## Promotion, collapse, and scaling
@@ -204,6 +208,10 @@ versatility, and resource non-inferiority gates without redefining them here:
 Compute label-efficiency area by trapezoidal integration against `log10(k)`,
 normalized by the grid's log-span; do not average the five points equally.
 
+During pretraining, sample source `d` with `p(d) ∝ n_d^alpha`. Choose `alpha`
+once at S0 from `{0, 0.5, 1}`, cap each source at 20%, redistribute excess
+mass, then freeze the choice and sampling sequence.
+
 At every validation checkpoint record embedding standard-deviation quantiles,
 covariance eigenvalues, active/effective rank, off-diagonal correlation,
 mean/nearest-neighbour cosine, alignment/uniformity, encoder and head gradient
@@ -214,7 +222,7 @@ deviation <1e-3; rank falls at least 50% while SSL loss improves; or a
 constant-vector baseline is indistinguishable at every label budget. These are
 preregistered engineering thresholds, not literature constants.
 
-| Stage | Model | Minimum unique flows / provenance-disjoint sources | Event exposures | Promotion gate |
+| Stage | Model | Minimum unique flows / independent sources | Event exposures | Promotion gate |
 |---|---:|---:|---:|---|
 | S0 | 3--5M | 5M / — | 20M | mechanism screen only |
 | S1 | 25M | 50M / 10 | 100M | external transfer |
