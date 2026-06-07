@@ -2,6 +2,21 @@
 
 Initial project scaffold for a deep learning model repository.
 
+## Model runs
+
+Model code lives on `m0`, `m1`, and `m2`; `m2` includes all eight variants.
+From a model branch, use one of these commands:
+
+```bash
+pixi run model M0 small       # Three-hour budget
+pixi run model max M0 small   # 72-hour budget
+```
+
+For the cluster, use `bash tools/scripts/slurm.sh --account=a_yourgroup`, or
+add `max` immediately after `slurm.sh` for 72 hours. Existing epoch limits and
+early stopping still apply. Max results use `results/<model>-<variant>/max/`.
+Incomplete evaluations stay out of plots. H100 runtime has not been measured.
+
 ## Setup
 
 ```bash
