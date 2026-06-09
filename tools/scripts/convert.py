@@ -176,7 +176,7 @@ def main(
                     console.print(
                         f"{verb} {output} ({human_size(input_size)} -> {human_size(output_size)})"
                     )
-            except Exception as error:
+            except (OSError, pl.exceptions.PolarsError) as error:
                 counts["failed"] += 1
                 if not quiet:
                     console.print(f"[red]Failed[/red] {jobs[job]}: {error}")
