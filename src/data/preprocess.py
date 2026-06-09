@@ -52,7 +52,7 @@ def _value(value: object) -> float:
 
 
 def _stats(frame: pl.LazyFrame, columns: list[str]) -> dict[str, dict[str, float]]:
-    expressions = []
+    expressions: list[pl.Expr] = []
     for column in columns:
         value = _numeric(column)
         if column in HEAVY_TAIL_COLUMNS:
@@ -80,7 +80,7 @@ def fit(train: pl.LazyFrame) -> State:
     categoricals = [column for column in categorical if column not in ports]
     numeric_stats = _stats(train, numeric)
 
-    expressions = []
+    expressions: list[pl.Expr] = []
     for column in numeric:
         value = _numeric(column)
         if column in HEAVY_TAIL_COLUMNS:

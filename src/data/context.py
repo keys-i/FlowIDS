@@ -31,7 +31,6 @@ def build(frame: pl.DataFrame, horizon_minutes: int, max_events: int) -> pl.Data
     group: tuple[object, object] | None = None
     previous: tuple[object, object, int, object] | None = None
     history: deque[tuple[int, int]] = deque()
-    position = 0
 
     # ponytail: Python scan first; move this to Polars only if 67M-flow profiling requires it.
     for source, partition, end_time, row, event in ordered.iter_rows():
@@ -46,10 +45,8 @@ def build(frame: pl.DataFrame, horizon_minutes: int, max_events: int) -> pl.Data
         if key != group:
             group = key
             history.clear()
-            position = 0
 
-        target = position
-        position += 1
+        target = len(targets)
         history.append((target, end_time))
         while end_time - history[0][1] > horizon:
             _ = history.popleft()
