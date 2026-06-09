@@ -2,12 +2,12 @@
 .DS_Store
 .idea/
 .vscode/
+.ruff.toml
 
 # Python
-__pycache__/
+*cache*/
 *.py[cod]
 *.so
-.*_cache/
 .coverage*
 htmlcov/
 build/
@@ -15,14 +15,10 @@ dist/
 *.egg-info/
 
 # Virtual environments
-.venv/
-venv/
+*venv/
 [eE][nN][vV]/
 .pixi/
 .python-version
-
-# Jupyter
-.ipynb_checkpoints/
 
 # Data and artifacts
 *.duckdb
@@ -32,11 +28,9 @@ artifacts/
 outputs/
 results/
 predictions/
-cache/
-.cache/
 
 # Training checkpoints / model weights
-checkpoints/
+*checkpoints/
 weights/
 *.ckpt
 *.pt*
@@ -50,11 +44,8 @@ weights/
 *.safetensors
 
 # Logs and experiment tracking
-logs/
+*logs/
 *.log
-runs/
+*runs/
 wandb/
-mlruns/
-lightning_logs/
-tb_logs/
 events.out.tfevents*

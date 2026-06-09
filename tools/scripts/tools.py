@@ -18,7 +18,7 @@ def run(*command: str | Path) -> None:
     _ = subprocess.run(command, cwd=ROOT, check=True)
 
 
-fmt = lambda: run("ruff", "format", ".", "--config", RUFF)
+fmt = lambda: run("ruff", "format", ".", "--config", RUFF)  # noqa: E731
 
 
 def clean() -> None:

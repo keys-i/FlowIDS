@@ -4,9 +4,6 @@ target-version = "py313"
 [lint]
 select = ["E", "F", "I"]
 
-[lint.per-file-ignores]
-"tools/scripts/tools.py" = ["E731"]
-
 [format]
 quote-style = "double"
 indent-style = "space"
