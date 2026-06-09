@@ -1,0 +1,95 @@
+from __future__ import annotations
+
+import shutil
+import subprocess
+import sys
+from collections.abc import Callable
+from pathlib import Path
+from typing import TypeVar
+
+ROOT = Path(__file__).resolve().parents[2]
+CONFIG = ROOT / "tools" / "config"
+RUFF = CONFIG / "ruff.toml"
+
+T = TypeVar("T")
+
+
+def run(*command: str | Path) -> None:
+    _ = subprocess.run(command, cwd=ROOT, check=True)
+
+
+fmt = lambda: run("ruff", "format", ".", "--config", RUFF)
+
+
+def clean() -> None:
+    paths = {
+        ROOT / name
+        for name in (
+            ".ruff_cache",
+            ".pytest_cache",
+            ".mypy_cache",
+            ".basedpyright",
+            "build",
+            "dist",
+        )
+    }
+    paths.update(ROOT.glob("*.egg-info"))
+    for source in (ROOT / "src", ROOT / "tools"):
+        paths.update(source.rglob("__pycache__"))
+
+    removed = 0
+    for path in sorted(paths, key=lambda item: len(item.parts), reverse=True):
+        if path.is_symlink() or path.is_file():
+            path.unlink()
+        elif path.is_dir():
+            shutil.rmtree(path)
+        else:
+            continue
+        removed += 1
+    print(f"Removed {removed} cache path(s).")
+
+
+def lint() -> None:
+    run("ruff", "format", "--check", ".", "--config", RUFF)
+    run("ruff", "check", ".", "--config", RUFF)
+    run("basedpyright", "src", "tools/scripts")
+
+
+def choose(prompt: str, options: list[T]) -> T:
+    print(f"\n{prompt}")
+    for index, option in enumerate(options, 1):
+        print(f"  {index}. {option}")
+
+    while True:
+        answer = input("Select: ").strip()
+        if answer.isdigit() and 1 <= int(answer) <= len(options):
+            return options[int(answer) - 1]
+        print(f"Enter a number from 1 to {len(options)}.")
+
+
+def model() -> None:
+    configs = sorted(path for path in CONFIG.glob("*.toml") if path.name != RUFF.name)
+    if not configs:
+        raise SystemExit(f"No model configs found in {CONFIG.relative_to(ROOT)}.")
+
+    try:
+        config = choose("Configuration", [path.relative_to(ROOT) for path in configs])
+        action = choose("Action", ["train", "evaluate"])
+    except (EOFError, KeyboardInterrupt):
+        raise SystemExit("\nCancelled.") from None
+
+    run(sys.executable, "-m", "src.main", action, "--config", config)
+
+
+COMMANDS: dict[str, Callable[[], None]] = {
+    "clean": clean,
+    "fmt": fmt,
+    "lint": lint,
+    "model": model,
+}
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2 or sys.argv[1] not in COMMANDS:
+        raise SystemExit(f"Usage: {Path(sys.argv[0]).name} <{'|'.join(COMMANDS)}>")
+    COMMANDS[sys.argv[1]]()

@@ -21,7 +21,14 @@ from rich.traceback import install
 _ = install(show_locals=False)
 
 type Compression = Literal["zstd", "snappy", "gzip", "brotli", "lz4", "uncompressed"]
-COMPRESSIONS: tuple[Compression, ...] = ("zstd", "snappy", "gzip", "brotli", "lz4", "uncompressed")
+COMPRESSIONS: tuple[Compression, ...] = (
+    "zstd",
+    "snappy",
+    "gzip",
+    "brotli",
+    "lz4",
+    "uncompressed",
+)
 
 
 def human_size(size: int) -> str:

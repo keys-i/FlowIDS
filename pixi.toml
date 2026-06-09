@@ -9,20 +9,13 @@ click = "*"
 duckdb-cli = "1.5.*"
 polars = "*"
 rich = "*"
-
-[tasks]
-convert = "python tools/scripts/convert.py"
-
-[feature.dev.dependencies]
 basedpyright = "*"
 ruff = "0.16.*"
 
-[feature.dev.tasks]
-lint = "ruff check . --config tools/configs/ruff.toml"
-format = "ruff format . --config tools/configs/ruff.toml"
-format-check = "ruff format --check . --config tools/configs/ruff.toml"
-typecheck = "basedpyright tools/scripts"
-check = { depends-on = ["lint", "format-check", "typecheck"] }
-
-[environments]
-dev = ["dev"]
+[tasks]
+convert = "python tools/scripts/convert.py"
+fmt = "python tools/scripts/tools.py fmt"
+clean = "python tools/scripts/tools.py clean"
+lint = "python tools/scripts/tools.py lint"
+model = "python tools/scripts/tools.py model"
+check = { depends-on = ["lint"] }

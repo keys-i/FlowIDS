@@ -8,7 +8,7 @@ on:
       - "pixi.lock"
       - "pixi.toml"
       - "src/**/*.py"
-      - "tools/configs/ruff.toml"
+      - "tools/config/ruff.toml"
       - "tools/scripts/**/*.py"
   pull_request:
     paths:
@@ -16,7 +16,7 @@ on:
       - "pixi.lock"
       - "pixi.toml"
       - "src/**/*.py"
-      - "tools/configs/ruff.toml"
+      - "tools/config/ruff.toml"
       - "tools/scripts/**/*.py"
 
 permissions:

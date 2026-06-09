@@ -9,8 +9,20 @@ them with DuckDB. Model code will start with M0 under `src/`.
 
 ```bash
 pixi install
-pixi run -e dev check
+pixi run lint
 ```
+
+## Commands
+
+```bash
+pixi run fmt
+pixi run lint
+pixi run clean
+pixi run model
+```
+
+`model` selects a TOML file from `tools/config/`, then runs `src/main.py` in
+training or evaluation mode.
 
 ## Convert data
 
@@ -25,6 +37,7 @@ pixi run duckdb < tools/scripts/exploration/profile.sql
 ```
 
 The other exploration queries are in `tools/scripts/exploration/`. Data stays
-under the ignored `data/` directory. The research plan is in `plan/`.
+under the ignored `data/` directory. The research plan is in `docs/plan/`.
 
-D0 is not complete. There is no model, split, or preprocessing code yet.
+Exploration is complete. M0 implementation is starting under `src/`; the model
+launcher is ready, but training and evaluation are not implemented yet.
