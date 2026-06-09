@@ -1,0 +1,7 @@
+{
+  "include": ["../../src", "../scripts"],
+  "extraPaths": ["../.."],
+  "pythonVersion": "3.13",
+  "reportAny": false,
+  "reportUnknownMemberType": false
+}

@@ -3,6 +3,7 @@ from __future__ import annotations
 import shutil
 import subprocess
 import sys
+import tomllib
 from collections.abc import Callable
 from pathlib import Path
 from typing import TypeVar
@@ -10,6 +11,8 @@ from typing import TypeVar
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG = ROOT / "tools" / "config"
 RUFF = CONFIG / "ruff.toml"
+BASEDPYRIGHT = CONFIG / "basedpyright.json"
+MODEL_IGNORE = {RUFF.name, BASEDPYRIGHT.name}
 
 T = TypeVar("T")
 
@@ -52,7 +55,7 @@ def clean() -> None:
 def lint() -> None:
     run("ruff", "format", "--check", ".", "--config", RUFF)
     run("ruff", "check", ".", "--config", RUFF)
-    run("basedpyright", "src", "tools/scripts")
+    run("basedpyright", "--project", BASEDPYRIGHT)
 
 
 def choose(prompt: str, options: list[T]) -> T:
@@ -67,13 +70,22 @@ def choose(prompt: str, options: list[T]) -> T:
         print(f"Enter a number from 1 to {len(options)}.")
 
 
+def config_name(path: Path) -> str:
+    with path.open("rb") as file:
+        description = tomllib.load(file).get("description")
+    if not isinstance(description, str) or not description.strip():
+        raise SystemExit(f"{path.name} needs a root description string.")
+    return f"{path.stem.replace('.', ' ').title()} - {description.strip()}"
+
+
 def model() -> None:
-    configs = sorted(path for path in CONFIG.glob("*.toml") if path.name != RUFF.name)
+    paths = sorted(path for path in CONFIG.glob("*.toml") if path.name not in MODEL_IGNORE)
+    configs = {config_name(path): path for path in paths}
     if not configs:
         raise SystemExit(f"No model configs found in {CONFIG.relative_to(ROOT)}.")
 
     try:
-        config = choose("Configuration", [path.relative_to(ROOT) for path in configs])
+        config = configs[choose("Configuration", list(configs))]
         action = choose("Action", ["train", "evaluate"])
     except (EOFError, KeyboardInterrupt):
         raise SystemExit("\nCancelled.") from None

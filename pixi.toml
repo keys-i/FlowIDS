@@ -18,4 +18,4 @@ fmt = "python tools/scripts/tools.py fmt"
 clean = "python tools/scripts/tools.py clean"
 lint = "python tools/scripts/tools.py lint"
 model = "python tools/scripts/tools.py model"
-check = { depends-on = ["lint"] }
+check = { depends-on = ["fmt", "lint"] }
