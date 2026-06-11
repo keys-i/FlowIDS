@@ -1,133 +1,129 @@
-# Architecture
+# Inputs and context
 
-I define inputs, causal context, and inference. See [Model](Model.md) for
-objectives, [Thesis](Thesis.md) for evaluation, and [Refs](Refs.md) for prior
-work.
-
-## Limits
-
-Supplied datasets are benchmarks. Results do not prove live-network
-performance, broad transfer, or a foundation model.
-
-## Exploration
-
-I follow the [NF3 exploration](../exp/explore.md) findings on schema,
-missingness, timestamps, duplicates, and features.
-
-## M0
-
-I start with **M0 Base**, the only FlowTransformer-style baseline: an offline,
-unrestricted 25M model with 255 earlier flows and its target. **M0 Matched** is
-the same model with a causal mask. **M0 Small** is an eight-token causal smoke
-check.
-
-I fit preprocessing on training only and reset causal state at partition
-boundaries. Code is not experimental evidence.
+This page defines what the [models](Model.md) can see. Each completed flow
+becomes a vector; the Transformer reads it with selected past flows and
+produces an attack score.
 
 ## Prediction unit and input features
 
-One completed bidirectional flow is one token. I exclude sources without a
-documented bidirectional pairing rule. Context stays inside its capture or
-exporter boundary.
+One token represents one completed bidirectional flow: both directions of
+an exchange. Exclude sources without a documented pairing rule. Keep
+history within its capture/exporter and [data partition](Thesis.md#evaluation-and-leakage-checks).
+Current code groups by dataset and partition; finer exporter boundaries need
+checking before adding multi-exporter data.
 
-During SSL I mask five semantic groups: transport and flags; service and ports;
-directional volume; packet-size and retransmission statistics; and duration and
-inter-arrival statistics. I use only completion-time fields with compatible
-meanings.
+The five groups used for masking are transport/flags, service/ports,
+directional volume, packet-size/retransmission statistics, and
+duration/inter-arrival statistics. Use completion-time fields with
+compatible meanings.
 
-I exclude addresses, flow IDs, labels, absolute timestamps, capture
-or scenario IDs, hostnames, collector or template IDs, and post-hoc metadata.
-Routing keys can choose records but never enter tensors.
+M1's exact field assignment is in `src/m1/masking.py`. TTL and TCP-window
+fields join transport; port IDs and ranges share the service mask. Numeric
+values and their missing flags are hidden together. Three-event spans are
+selected with probability 0.3, with a random offset per group. Padding is
+excluded; an otherwise unmasked example hides one group on its last event.
+M1 reconstruct excludes imputed numeric targets, averages each loss type within a group,
+then averages selected groups. M1 teacher scores only events with a masked group.
 
-Ports 0 to 1023 stay exact. Higher training ports use eight training-frequency
-buckets plus `REGISTERED` (1024 to 49151) or `DYNAMIC` (49152 to 65535); unseen
-higher ports use `UNK` plus a range. `PAD` and `MISSING` differ. I require a
-port-free result. `L7_PROTO` stays out unless a compatible secondary
-sensitivity check proves it is not a label proxy.
+Exclude addresses, flow IDs, labels, absolute timestamps, capture/scenario
+IDs, hostnames, collector/template IDs, and post-hoc metadata. Addresses may
+select history but their values never enter model inputs. Test renamed and
+unseen endpoints because relationships can still reveal dataset shortcuts.
 
-I fit numeric transforms, vocabularies, and port buckets on training only.
-Numeric fields use median imputation with a missingness bit, `log1p` for heavy
-tails, 1st/99th-percentile clipping, and z-scores. Unavailable elapsed times are
-missing, not zero. Batches retain elapsed time since the previous flow and
-endpoint-sharing flow; M0 ignores both.
+<details>
+<summary>Field encoding</summary>
+
+Fit transforms and vocabularies on training data only.
+
+- Keep ports 0–1023 exact. Other training ports use eight frequency buckets
+  plus `REGISTERED` (1024–49151) or `DYNAMIC` (49152–65535); unseen ports use
+  `UNK` plus a range. `PAD` and `MISSING` differ. Require a port-free result.
+  Exclude `L7_PROTO` unless a compatible secondary test shows it is not a
+  label proxy.
+- Numeric fields use median imputation, a missingness bit, `log1p` for heavy
+  tails, 1st/99th-percentile clipping, and z-scores.
+- M0 and M1 do not use gaps between flows. Duration and within-flow
+  inter-arrival fields describe the flow itself. Later models may add gaps
+  since the previous flow or endpoint-sharing flow, retaining missingness.
+
+</details>
 
 ## Context and endpoint relationships
 
-I order completed flows deterministically and select at most 255 earlier
-qualifying events before the target. I test 1-, 10-, or 60-minute horizons and
-reset state at every partition boundary. Future events, padding, labels, raw
-identities, and post-hoc fields never affect an encoder input.
+Flat history uses recent flows; endpoint history uses flows involving either
+host in the target. See [the example](Model.md#which-past-flows-should-the-model-see).
 
-M3-Ego takes up to 128 earlier events incident to each target endpoint, unions
-and deduplicates them, then keeps the latest 255. Same-size controls use the
-latest collector events (`flat-matched`), deterministic non-incident events
-(`random-matched`), or non-incident events ranked by protocol mismatch,
-port-range mismatch count, completion-lag difference, then transformed
-duration, byte, and packet L1 distance
-(`time-feature-matched`).
+Order completed flows deterministically. M0 uses a ten-minute window and
+breaks completion-time ties by source-local row index. The 256-event models
+keep the latest 255 qualifying earlier flows, then the target. Future events
+and labels cannot choose or populate history. Ignore padding in attention and
+losses; reset history at every partition boundary.
 
-`random-matched` keeps the lowest
-`SHA-256(run_seed || target_event_id || candidate_event_id)`. `target-only` has
-no history. `conversation` uses earlier flows between the same unordered
-endpoint pair and keeps direction fields. `source-host` uses earlier flows sent
-by the target source to any destination; I use it only where source/initiator
-direction has the same meaning across corpora.
+<details>
+<summary>History selection and relation types</summary>
 
-Too few non-incident candidates makes a target unsupported. Any control
-equalling or beating ego rejects the claim.
+M3-Ego takes up to 128 earlier events per endpoint, unions and deduplicates
+them, then keeps the latest 255. Same-size controls use:
 
-For M2-F, I order candidates by completion time and event ID. I keep later
-flows in the same corpus, stream, and pretraining partition that touch either
-anchor endpoint. Deduplicated positions 1, 4, and 16 are targets. Each teacher
-sees its target and causal 255-event prefix. The student sees neither. I omit
-missing positions.
+- `flat-matched`: latest collector events;
+- `random-matched`: non-endpoint events with the lowest
+  `SHA-256(run_seed || target_event_id || candidate_event_id)`;
+- `time-feature-matched`: non-endpoint events ranked by protocol mismatch,
+  port-range mismatch count, completion-lag difference, then transformed
+  duration, byte, and packet L1 distance.
 
-For endpoint-disjoint evaluation, I assign held-out principals before building
-context: held-out to held-out flows are test, mixed flows are purged, and the
-rest are training. Test context uses only earlier completed test flows. Offline
-replay and streaming must preserve ordering, padding, masks, relation types,
-and state resets. State also clears at adaptation, calibration, and test
-boundaries.
+Exclude targets with too few non-endpoint candidates from matched tests.
+Endpoint history must beat every control. Also compare `target-only` (no
+history), `conversation` (same unordered endpoint pair, keeping direction),
+and `source-host` (target source to any destination). Use the latter only
+where source/initiator direction means the same thing across datasets.
 
-I use 16 anonymous directed relation types. Four equality bits between the
-current and earlier flow endpoints choose the type: `src-src`, `dst-dst`,
-`src-earlier-dst`, and `dst-earlier-src`. Each attention head adds its learned
-type scalar to the causal logit.
-Raw identities and feature, port, or protocol similarity are excluded.
-Renaming routing keys must not change output.
+For endpoint-disjoint tests, assign held-out hosts before building history:
+both endpoints held out means test; mixed pairs are purged; the rest are
+training. Test history uses earlier completed test flows. Offline replay and
+streaming must agree on order, padding, masks, relations, and state resets,
+including adaptation/calibration/test boundaries.
 
-I also permute relation types within source, day, and relative-time strata. A
-surviving gain fails the relation claim.
+M4-Rel uses four endpoint-equality bits: `src-src`, `dst-dst`,
+`src-earlier-dst`, and `dst-earlier-src`. These select one of 16 anonymous
+directed types. Each attention head adds a learned type scalar to its causal
+score. Exclude address values and feature/port/protocol similarity. Renaming
+routing keys must leave output unchanged.
+
+Shuffle types within source, day, and relative-time groups. A gain that
+survives shuffling is not explained by the true relations.
+
+### Future targets
+
+M2 future-hybrid and future-jepa target deduplicated later endpoint-related flows at positions 1, 4,
+and 16, ordered by completion time then event ID, within the same corpus,
+stream, and pretraining partition. Targets must complete strictly after the
+anchor; equal completion times are excluded. The teacher has dropout off and sees each
+target with up to 255 earlier events within the configured history age limit. The student sees only masked history
+through the anchor; later records cannot enter its input. Omit missing
+positions. [Model](Model.md#training-objectives-and-controls) defines the loss.
+
+</details>
 
 ## Encoder and inference
 
-During SSL I feed the encoder only completed source flows and causal contexts.
-[Model](Model.md#training-objectives-and-controls) defines the temporary heads.
-The deployed encoder is a factorized record encoder plus a post-LN Transformer
-with no positional signal. Its completed target state feeds the downstream
-head. I remove SSL heads and teachers before inference.
+After pretraining, keep the record encoder, Transformer, and attack head;
+remove prediction heads and teachers. [Model](Model.md#m0-supervised-models)
+owns the shapes and attention masks.
 
-M0 Base and M0 Matched use the same fields, factorized encoder, post-LN
-Transformer, head, context length, and training setup. The sole architectural
-difference is attention masking. The complete classifier must be within 5
-percent of 25M trainable parameters. M0 Small is deliberately not matched.
+Score at flow completion. The target is p95 CPU inference ≤2 ms per flow,
+excluding a batching wait ≤5 ms. Report p50/p95/p99 latency, throughput,
+device memory, endpoint-state memory, and missing-field behaviour.
+Packet-prefix/live scoring needs active snapshots and is outside this plan.
 
-I score at flow completion from that flow and strictly earlier completed flows.
-Packet-prefix scoring is out of scope. The target is p95 CPU inference at or
-below 2 ms per completed flow, excluding a dynamic-batching wait of at most 5
-ms. I report p50, p95, p99, throughput, device memory, endpoint-state memory,
-and missing-field behavior.
+<details>
+<summary>Conditional model inputs</summary>
 
-## Optional work
+X1's deployed student reads only the main flow fields. M5 uses 1-, 10-, and
+60-second causal windows with the same anonymous relations: two weight-shared
+window encoders, six causal summary blocks, record encoder, and projections,
+all within 25M ±5% parameters. Neither adds a second model, GNN, SSM, memory
+bank, or generative decoder. [Model](Model.md#experiment-sequence) owns the
+conditions for trying them.
 
-I run **X1-Distill** only with safe, exact packet-to-flow pairs. The deployed
-student reads only the main flow view.
-
-I consider **M5-Hier** only after [Model's trigger](Model.md#experiment-sequence).
-It uses 1-, 10-, and 60-second causal windows with the same anonymous
-relations.
-
-Two weight-shared window encoders and six causal summary blocks,
-plus the record encoder and projections, stay within the 25M plus or minus 5
-percent capacity. I do not add a second model, GNN, SSM, memory bank, or
-generative decoder.
+</details>
