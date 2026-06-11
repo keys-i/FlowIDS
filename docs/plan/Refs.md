@@ -1,37 +1,39 @@
-# Research evidence and novelty ledger
+# Research evidence and novelty notes
 
-**Cutoff:** 2026-08-17. This is a finite audit of original papers, official
-artifacts, standards, datasets, and one explicitly labeled systematic
-review—not an exhaustive review. Search coverage includes IEEE Xplore, ACM DL, SpringerLink,
-ScienceDirect, USENIX, arXiv, official standards/data/repositories, and
-backward/forward citation trails. Query families: `NetFlow AND (SSL OR foundation OR transformer
-OR masked)`; `network traffic AND (MAE OR teacher-student OR EMA OR cross-flow
-OR relation)`; `IDS AND (temporal graph OR domain transfer OR few-shot OR
-cross-dataset)`. Venue indexing and repository links were checked where stated;
-an `UNVERIFIED` field means no usable primary-method record was verified here.
+**Cutoff:** 2026-08-19. This dated review covers original papers, official
+artifacts, standards, datasets, and one clearly labelled systematic review. It
+is not exhaustive. Searches covered IEEE Xplore, ACM Digital Library,
+SpringerLink, ScienceDirect, USENIX, arXiv, official standards, datasets,
+repositories, and backward and forward citation trails. The main queries were
+`NetFlow AND (SSL OR foundation OR transformer OR masked)`, `network traffic
+AND (MAE OR teacher-student OR EMA OR cross-flow OR relation)`, `IDS AND
+(temporal graph OR domain transfer OR few-shot OR cross-dataset)`, and `time
+series AND (JEPA OR joint embedding OR next-latent)`. Venue indexing and
+repository links were checked where noted. `UNVERIFIED` means that no usable
+primary source was confirmed for that point.
 
-**Ledger convention:** the citation states publication status; each following
-sentence records verified modality, objective, context, data/split, scale,
-result, artifact, imported evidence, or limitation as applicable. Any split,
-code, data, parameter, compute, or result field not stated is `UNVERIFIED` and
-cannot support a project claim.
+**How to read these notes:** each citation gives its publication status. The
+text that follows records the verified modality, objective, context, data and
+split, scale, result, artifact, relevance, or limitation. If a split, code,
+data, parameter count, compute figure, or result is not stated, treat it as
+`UNVERIFIED` and do not use it to support a claim.
 
-## Prior-art and reproduction boundaries
+## Closest work and reproduction status
 
-### Closest-work matrix
+### Closest work
 
-| Claim | Closest record(s) | Exact overlap | Material difference | Reproducibility | Verdict |
+| Method | Closest work | Shared idea | Important difference | Reproduction status | What follows |
 |---|---|---|---|---|---|
-| M1-R | [MMAE2026](#mmae2026) | Generic masked traffic representation learning | MMAE reconstructs five-packet byte flows with FlowMix; M1-R masks NetFlow feature groups | Code released; reproduction UNVERIFIED | Generic masked-flow novelty rejected |
-| M1-L | [MMAE2026](#mmae2026), [data2vec](#data2vec) | Corrupted student aligned to an unmasked EMA teacher | MMAE aligns reconstructed byte-flow tokens; M1-L targets a causal NetFlow event state | MMAE code released | EMA/latent-target novelty rejected |
-| M2-H | [MMAE2026](#mmae2026) | Reconstruction plus EMA latent alignment | Different modality, corruption, context, and target | MMAE code released | Generic hybrid-objective novelty rejected |
-| M2-F | [CPC](#cpc), [NetFlowGen](#netflowgen) | Predictive representation learning and pretrained NetFlow dynamics | No verified record here uses the exact future endpoint-incident latent/aggregate targets under the proposed causal contract | NetFlowGen code/checkpoint UNVERIFIED | No generic next-step novelty; task-specific formulation is provisional |
+| M1-R | [MMAE2026](#mmae2026) | Generic masked traffic representation learning | MMAE reconstructs five-packet byte flows with FlowMix; M1-R masks NetFlow feature groups | Code released; reproduction `UNVERIFIED` | Masked-flow learning is not new |
+| M1-L | [MMAE2026](#mmae2026), [data2vec](#data2vec) | Corrupted student aligned to an unmasked EMA teacher | MMAE aligns reconstructed byte-flow tokens; M1-L targets a causal NetFlow event state | Code released; reproduction `UNVERIFIED` | EMA latent targets are not new |
+| M2-H | [MMAE2026](#mmae2026) | Reconstruction plus EMA latent alignment | Different modality, corruption, context, and target | Code released; reproduction `UNVERIFIED` | The hybrid objective is not new on its own |
+| M2-F | [CPC](#cpc), [IJEPA](#ijepa), [VJEPA](#vjepa), [TSJEPA](#tsjepa), [LeNEPA](#lenepa), [NetFlowGen](#netflowgen) | Predictive latent learning, masked joint embedding, temporal feature prediction, or pretrained NetFlow dynamics; LeNEPA directly covers causal next-latent prediction | This project predicts a later completed flow that touches either anchor endpoint, encodes it with its own causal prefix, and tests external low-label transfer | I-JEPA, V-JEPA, TS-JEPA, and LeNEPA code exists but reproduction is UNVERIFIED; NetFlowGen code and checkpoint are UNVERIFIED | The generic JEPA-family and next-latent ideas are not new; the endpoint-incident causal NetFlow setup remains provisional |
 | M3-Ego | [CMESCrossFlow2026](#cmescrossflow2026), [MMAE2026](#mmae2026), [VanLangendonckGraphFM](#vanlangendonckgraphfm) | Cross-flow organization, corruption, or endpoint topology | CMES is rule-grouped/bidirectional; MMAE uses a support flow as a patch repository; the graph FM is a different dynamic graph unit | CMES model code UNVERIFIED; graph checkpoint UNVERIFIED | System component only, defensible after endpoint-defined past-only causal ablations pass |
-| M4-Rel | [CMESCrossFlow2026](#cmescrossflow2026) | Four-bit/16-type learned cross-flow attention bias | Proposed bits encode directed endpoint equality under a causal mask | Model code UNVERIFIED | No standalone relation-bias novelty; system component only |
-| M5-Hier | [netFound](#netfound), [MM4flow](#mm4flow), [MMAE2026](#mmae2026) | Multi-granularity or multimodal traffic representation | Different units and hierarchy | netFound/MMAE artifacts available; MM4flow reproduction UNVERIFIED | Hierarchy novelty rejected |
+| M4-Rel | [CMESCrossFlow2026](#cmescrossflow2026) | Four-bit/16-type learned cross-flow attention bias | Proposed bits encode directed endpoint equality under a causal mask | Model code UNVERIFIED | Relation bias is not new on its own; it can count only as part of the system |
+| M5-Hier | [netFound](#netfound), [MM4flow](#mm4flow), [MMAE2026](#mmae2026) | Multi-granularity or multimodal traffic representation | Different units and hierarchy | netFound/MMAE artifacts available; MM4flow reproduction UNVERIFIED | Hierarchy is not new |
 | X1-Distill | Generic distillation plus [YaTC](#yatc), [netFound](#netfound), and [MM4flow](#mm4flow) | Packet knowledge transferred into traffic representations | Exact packet-teacher to NetFlow-only student claim not verified in this search; YaTC is a packet-view comparator and conditional teacher candidate, not an interchangeable teacher | Requires renewed search, paired data, and verified preprocessing/checkpoint compatibility | Provisional only |
 
-## Requested traffic/IDS records
+## Traffic and IDS papers
 
 ### FlowTransformer2024
 
@@ -53,10 +55,10 @@ https://github.com/keys-i/FlowIDS/commit/828582d0a2b6a8f8fbf090dae84328490563629
 Repository artifact. The snapshot configures fixed eight-flow windows over each
 source globally sorted by `FLOW_START_MILLISECONDS`, no positional signal, and
 a bidirectional PyTorch `TransformerEncoder`; its heads make next-flow
-multitask categorical and numeric predictions. It is forensic historical
-evidence only: no eligible checkpoint, immutable data/split artifact, or
-reproducible result accompanies that commit, so it is not a baseline result or
-a precursor foundation model.
+multitask categorical and numeric predictions. It only shows what the old
+prototype did. The commit includes no usable checkpoint, fixed data or split
+record, or reproducible result, so it does not count as a baseline or an early
+foundation model.
 
 ### EGraphSAGE
 
@@ -209,8 +211,7 @@ or operational foundation-model evidence was verified.
 `GNNet graph foundation model` is **UNRESOLVED**: the supplied name does not
 identify a unique traffic model, paper, DOI, or official repository. It is not
 a synonym assigned here to [VanLangendonckGraphFM](#vanlangendonckgraphfm).
-No reproduction or comparison is permitted until the exact primary artifact
-is identified.
+Do not reproduce or compare it until the exact primary artifact is identified.
 
 ### TimestampGraphContrastive
 
@@ -227,7 +228,7 @@ unreproduced here.
 H. Bai, L. Chen, and Q. Dai, “Self-Supervised Intrusion Detection Algorithm
 Based on Dynamic Spatiotemporal Graph,” *Applied Intelligence*, vol. 56,
 no. 10, art. 344, 2026, https://doi.org/10.1007/s10489-026-07371-2.
-Publisher-method access was unavailable during this audit; detailed method,
+Publisher-method access was unavailable during this review; detailed method,
 data, and result claims remain **UNVERIFIED**.
 
 ### TrafficMAE
@@ -383,7 +384,7 @@ https://arxiv.org/abs/2503.22663. It models interleaved flow/session state for
 trace generation, not IDS or classification; source code/checkpoint was not
 verified.
 
-## SSL and model roots
+## Foundations for SSL and model design
 
 ### DenoisingAutoencoder
 
@@ -455,17 +456,66 @@ Masked reconstruction; no traffic claim.
 
 A. Baevski *et al.*, “data2vec: A General Framework for Self-Supervised
 Learning in Speech, Vision and Language,” *ICML*, 2022.
-https://proceedings.mlr.press/v162/baevski22a.html. EMA contextual target,
-multimodal; not traffic-specific.
+https://proceedings.mlr.press/v162/baevski22a.html. A masked student predicts
+contextual representations from a full-input EMA teacher, using the mean of the
+teacher's top normalized Transformer blocks. This is the direct basis for
+M1-L's same-event EMA target, not a future-prediction objective. It covers
+speech, vision, and language rather than NetFlow, and provides no evidence for
+causal serving or external NetFlow transfer. Project reproduction is
+**UNVERIFIED**.
 
 ### IJEPA
 
 A. Assran *et al.*, “Self-Supervised Learning from Images with a Joint-
 Embedding Predictive Architecture,” CVPR, 2023.
 https://openaccess.thecvf.com/content/CVPR2023/html/Assran_Self-Supervised_Learning_From_Images_With_a_Joint-Embedding_Predictive_Architecture_CVPR_2023_paper.html.
-Masked latent prediction; not traffic-specific.
+Preprint: https://arxiv.org/abs/2301.08243. A context encoder predicts masked
+image-block representations from an EMA target encoder. The target blocks come
+from the same image, not a future stream. The paper establishes masked
+joint-embedding prediction, but not causal next-event learning or NetFlow.
+Official code: https://github.com/facebookresearch/ijepa. Its ImageNet scale
+and vision results are not comparable with this project. Reproduction is
+**UNVERIFIED**.
 
-## Tabular, temporal, graph, and state-space roots
+### VJEPA
+
+A. Bardes, Q. Garrido, J. Ponce, X. Chen, M. Rabbat, Y. LeCun, M. Assran, and
+N. Ballas, “Revisiting Feature Prediction for Learning Visual Representations
+from Video,” arXiv:2404.08471, 2024, https://arxiv.org/abs/2404.08471.
+Preprint. V-JEPA predicts latent target features from video context with an EMA
+target encoder. It establishes feature-prediction precedent, but not NetFlow,
+strictly causal future-only serving, endpoint-disjoint transfer, or IDS. The
+paper reports pretraining on two million videos and frozen-backbone vision
+results. Official code: https://github.com/facebookresearch/jepa. Reproduction
+is **UNVERIFIED**.
+
+### TSJEPA
+
+S. Ennadir, S. Golkar, and L. Sarra, “Joint Embeddings Go Temporal,”
+arXiv:2509.25449v1, 29 Sep. 2025, https://arxiv.org/abs/2509.25449.
+Preprint. The arXiv record says it was accepted at the *Workshop on Time Series
+in the Age of Large Models*, NeurIPS 2024, but that chronology is
+**UNVERIFIED**. The method applies JEPA-style learning to univariate time-series
+classification and forecasting, not NetFlow. It predicts uniformly masked
+time-series patches with a 128-wide, two-head Transformer predictor and EMA
+target encoder; it does not define causal future-only pretraining. The paper
+reports frozen evaluation on sensor and forecasting datasets using an NVIDIA
+V100. Official code: https://github.com/Sennadir/TS_JEPA. The results are
+author-reported and reproduction is **UNVERIFIED**.
+
+### LeNEPA
+
+A. Chemeris, M. Jin, and R. Balestriero, “LeNEPA: No-Augmentation Next-Latent
+Prediction for Time-Series Representation Learning,” arXiv:2607.00958v1,
+1 Jul. 2026, https://arxiv.org/abs/2607.00958. Preprint. The record reports
+acceptance at the 12th MiLeTS Workshop at KDD 2026. Official code:
+https://github.com/langotime/lenepa-milets-2026. LeNEPA trains causal
+next-latent prediction without augmentation and uses SIGReg rather than an EMA
+teacher. It means generic causal next-latent prediction cannot be claimed as
+new here. Its use on NetFlow, endpoint-incident target, external-transfer
+split, parameters, compute, and numerical reproduction are **UNVERIFIED**.
+
+## Related tabular, temporal, graph, and state-space work
 
 ### VIME
 
@@ -566,7 +616,7 @@ datasets. This is adjacent time-series foundation-model evidence, not NetFlow
 representation or IDS evidence; its generative quantization is excluded from
 the core progression.
 
-## Adaptation and anomaly roots
+## Adaptation and anomaly detection
 
 ### DAPT
 
@@ -592,7 +642,7 @@ labels/training split define validity.
 W. Liu *et al.*, “Energy-based Out-of-distribution Detection,” NeurIPS, 2020.
 https://proceedings.neurips.cc/paper/2020/hash/f5496252609c43eb8a3d147ab9b9c006-Abstract.html. Energy score OOD; calibration/data shift still require evaluation.
 
-## Evaluation roots
+## Evaluation methods
 
 ### NTFMReview2026
 
@@ -601,8 +651,8 @@ R. Pérez-Jove, C. R. Munteanu, J. Dorado, A. Pazos, and J. Vázquez-Naya,
 Networks*, vol. 276, 111998, 2026,
 https://doi.org/10.1016/j.comnet.2026.111998. Its review of 51 primary studies
 finds limited cross-task transfer and scarce terabyte-scale corpora. It maps
-the field but supplies no matched experiment for this proposal; the project’s
-dated primary-source ledger and refreshed novelty search remain necessary.
+the field but supplies no matched experiment for this proposal; the project's
+dated primary-source notes and updated literature search remain necessary.
 
 ### Dedup
 
@@ -610,7 +660,7 @@ K. Lee *et al.*, “Deduplicating Training Data Makes Language Models Better,”
 *ACL 2022*, https://aclanthology.org/2022.acl-long.577/. This establishes that
 duplicate training examples can distort memorization and evaluation in an
 adjacent foundation-model domain. It does not define traffic equivalence;
-exact and near-duplicate NetFlow keys must still be specified and audited
+exact and near-duplicate NetFlow keys still need to be defined and checked
 before split assignment.
 
 ### ComputeScaling
@@ -661,7 +711,7 @@ J. Demšar, “Statistical Comparisons of Classifiers over Multiple Data Sets,�
 JMLR, 2006. https://jmlr.org/papers/v7/demsar06a.html. Use paired repeated
 splits/datasets and disclose multiplicity; a single split is insufficient.
 
-## Official standards and data sources
+## Standards and datasets
 
 ### IPFIXRFC7011
 
@@ -744,7 +794,7 @@ https://www.unb.ca/cic/datasets/iotdataset-2022.html. Dataset. The CIC page
 describes power, idle, interaction, scenario, active, and attack captures,
 including multi-device settings and repeated capture groups. It is a device
 probe only if the acquired instance/device and capture-period group structure
-is auditable; otherwise device-disjoint claims are **UNVERIFIED**. Raw MAC/IP
+can be checked; otherwise device-disjoint claims are **UNVERIFIED**. Raw MAC/IP
 identifiers are not evidence of transferable device behaviour.
 
 ### UGR16
@@ -799,10 +849,10 @@ detectors for automated anomaly labeling and performance benchmarking,” *CoNEX
 2010*, https://www.fukuda-lab.org/mawilab/. MAWILab data updates stopped in
 December 2024; do not treat post-2024 MAWI traces as MAWILab-labelled data.
 
-## Explicit exclusions
+## Work left out
 
-The requested “contextualised-NetFlow review” remains unresolved/excluded: no
-stable identifier was located. The unresolved `GNNet` label is recorded above.
-Unsourced summaries, marketing pages, and papers without adequate method
-access are not used as novelty evidence; the labeled systematic review maps the
-field but cannot establish a mechanism claim.
+No stable identifier was found for the requested “contextualised-NetFlow
+review,” so it is left out. The unresolved `GNNet` label is recorded above.
+Unsourced summaries, marketing pages, and papers without enough method detail
+do not count as evidence that a mechanism is new. The labelled systematic
+review maps the field but cannot establish that claim by itself.

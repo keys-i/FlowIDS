@@ -84,7 +84,7 @@ behaviour.
 The primary model therefore receives no raw addresses, endpoint identity,
 five-tuple, absolute time, capture/day identifiers, or `L7_PROTO`. Ports keep
 the restricted representation in
-[Architecture](../plan/Architecture.md#prediction-unit-and-feature-view), and
+[Architecture](../plan/Architecture.md#prediction-unit-and-input-features), and
 a port-free result is mandatory.
 
 ## M0 decisions
@@ -100,7 +100,7 @@ a port-free result is mandatory.
    conflicts explicitly.
 6. Use the primary fields and causal context defined in
    [Architecture](../plan/Architecture.md), then evaluate with the metrics and
-   label budgets in [Thesis](../plan/Thesis.md#evaluation-and-leakage-contract).
+   label budgets in [Thesis](../plan/Thesis.md#evaluation-and-leakage-checks).
 
 Exploration is complete. The next stage is M0; these results do not establish
 transfer, operational generalisation, or a foundation model.
