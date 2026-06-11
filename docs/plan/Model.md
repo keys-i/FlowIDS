@@ -25,22 +25,35 @@ transfer evaluation can support a transfer claim.
 
 ## Locked deployable backbone
 
-All neural rungs use one completed bidirectional flow per token and the same
-deployable encoder unless size is the isolated variable. The record encoder has
-train-only transformed numeric fields with field-specific projections,
-categorical embeddings with PAD/UNK, missingness embeddings, and a two-layer
-projection to event width. The causal Transformer is d_model=512, eight pre-LN
-blocks, eight heads, FFN 2048, GELU, nominal dropout 0.1, RoPE sequence
-position, and learned elapsed-time features. It consumes at most 256 events
-under the Architecture context contract and uses the final completed-flow
-state. The Transformer
-blocks alone are approximately 25.2M weights. Count the record encoder,
-embeddings, and backbone in the complete deployable total; if it falls outside
-25M ±5%, reduce FFN width only enough to enter the band before any experiment,
-then freeze that measured architecture for every rung. SSL decoders,
-predictors, and EMA copies are removed at inference; their training FLOPs and
-memory are reported. A bidirectional model is an offline upper bound, never a
-deployable equivalent.
+All promoted neural rungs use one completed bidirectional flow per token and
+the same deployable encoder unless size is the isolated variable. The M0
+Matched record encoder is a factorized equivalent to one-hot record projection
+under this project's PAD/UNK/missing scheme: it linearly projects transformed
+numeric values and their missingness, then combines them with categorical
+embeddings. The M0 Matched Transformer has d_model=512, eight post-LN blocks,
+eight heads, FFN 1792, ReLU, dropout 0.1, no positional encoding, and a
+last-token binary head. It consumes at most 256 events under the Architecture
+context contract. Count the record encoder, embeddings, and backbone in the complete deployable total; it
+must remain within 25M ±5%, then freeze that measured architecture for every
+rung. SSL decoders, predictors, and EMA copies are removed at inference; their
+training FLOPs and memory are reported. A bidirectional model is an offline
+upper bound, never a deployable equivalent.
+
+### Supervised M0 models
+
+The models below use the same permitted fields, preprocessing, labels, and
+splits. They are FlowTransformer-style PyTorch models under this project
+contract, not exact reproductions of the original Keras framework.
+
+- **M0 Base:** the 25M FlowTransformer-style PyTorch model with unrestricted
+  attention. It is the offline comparator.
+- **M0 Small:** the causal eight-flow version for cheap screening: d_model=64,
+  two post-LN blocks, two heads, FFN 128, ReLU, dropout 0.1, and no positional
+  encoding. It is not capacity-matched to M0 Matched.
+- **M0 Matched:** the 25M causal, padding-safe model. It has exactly the same
+  parameterization, architecture, capacity, record encoder, and last-token
+  head as M0 Base except for the attention mask. The causal change is a
+  hypothesis under test, not an established improvement.
 
 One development-data search selects, then freezes: context horizon {1, 10,
 60} minutes; learning rate {1e-4, 3e-4}; weight decay {0.01, 0.05}; and
@@ -54,13 +67,13 @@ FP32 on the validation smoke test.
 ### Exact S0 screening instantiation
 
 S0 is not a second architecture: use the same token semantics, causal mask,
-RoPE, elapsed-time projection, optimizer schedule, objectives, and downstream
-protocol at d_model=256, four pre-LN blocks, eight heads, FFN 1024, and maximum
-256 events. Its four blocks contain about 3.16M parameters. Cap the tokenizer
-at 1.5M parameters so the complete trainable encoder is 3--5M; report the exact
-count before screening. Screen at least 5M unique flows and exactly 20M event
-exposures. S0 changes only capacity, so a mechanism passing S0 must be
-confirmed at S1 before any claim.
+post-LN blocks, ReLU, no positional encoding, optimizer schedule, objectives,
+and downstream protocol at d_model=256, four blocks, eight heads, FFN 1024,
+and maximum 256 events. Its four blocks contain about 3.16M parameters. Cap
+the tokenizer at 1.5M parameters so the complete trainable encoder is 3--5M;
+report the exact count before screening. Screen at least 5M unique flows and
+exactly 20M event exposures. S0 changes only capacity, so a mechanism passing
+S0 must be confirmed at S1 before any claim.
 
 ## Objectives and objective controls
 
@@ -112,10 +125,9 @@ log-bytes/log-packets, stratified by protocol and port range with
 protocol/global fallback); regularized logistic regression; Isolation Forest;
 OC-SVM on a predeclared feasible sample; CatBoost or LightGBM target-flow
 classifier; that tree with deterministic past-context aggregates; per-flow
-MLP; supervised flat causal Transformer; the `historical-recreation`; matched
-random initialization; and frozen linear probe plus full fine-tuning for every
-pretrained encoder. No candidate advances by beating only a weak neural
-control.
+MLP; M0 Small; M0 Base; M0 Matched; matched random initialization of M0
+Matched; and frozen linear probe plus full fine-tuning for every pretrained
+encoder. No candidate advances by beating only a weak neural control.
 
 Where code and schema permit, run E-GraphSAGE, Anomal-E, NEGSC, GraphIDS, and
 the verified Van Langendonck graph-foundation model. The requested GNNet name
@@ -142,11 +154,11 @@ claimed overlap are governed by
 
 | Rung | Sole promoted difference | Required evidence | Immediate rejection |
 |---|---|---|---|
-| Exploration | No model | Complete: the existing DuckDB queries inspected schema, distributions, usable features, duplicates, time shift, and leakage risks. See the [findings](../exp/explore.md). | Exploration is not promotion evidence. Carry its exclusions and data-handling decisions into M0. |
-| M0 | 25M backbone trained only on labels | Before training, [build the actual splits, train-only preprocessing, and causal-context checks under `src`](Architecture.md#m0-implementation); then establish the reference versus every applicable classical control. | If it fails the [classical-parity gate](#classical-parity-discriminator), permit only that restricted S0 discriminator; do not scale. |
-| M1-R | L_raw pretraining on flat causal contexts | Pass the common frozen promotion gate below against random-init M0. | Reject if gain needs identifiers or ports, vanishes chronologically, or is in-domain only. |
-| M1-L | L_latent instead of raw; parallel constituent | Pass collapse screen and beat M0 in the separate exposure-matched and FLOP-matched comparisons. | Reject if raw matches it or teacher/student collapse persists. |
-| M2-H | Add the other constituent: L_raw + L_latent | Beat M1-R and M1-L, not merely M0, under exposure and FLOP matching. | Reject if either constituent or MMAE-NF matches it. |
+| Exploration | No model | Complete: the existing DuckDB queries inspected schema, distributions, usable features, duplicates, time shift, and leakage risks. See the [findings](../exp/explore.md). | Exploration is not promotion evidence. Carry its exclusions and data-handling decisions into M0 Matched. |
+| M0 Matched | 25M backbone trained only on labels | Before training, [build the actual splits, train-only preprocessing, and causal-context checks under `src`](Architecture.md#m0-implementation); then establish the reference versus every applicable classical control. | If it fails the [classical-parity gate](#classical-parity-discriminator), permit only that restricted S0 discriminator; do not scale. |
+| M1-R | L_raw pretraining on flat causal contexts | Pass the common frozen promotion gate below against random-init M0 Matched. | Reject if gain needs identifiers or ports, vanishes chronologically, or is in-domain only. |
+| M1-L | L_latent instead of raw; parallel constituent | Pass collapse screen and beat M0 Matched in the separate exposure-matched and FLOP-matched comparisons. | Reject if raw matches it or teacher/student collapse persists. |
+| M2-H | Add the other constituent: L_raw + L_latent | Beat M1-R and M1-L, not merely M0 Matched, under exposure and FLOP matching. | Reject if either constituent or MMAE-NF matches it. |
 | M2-F | Conditionally add L_future | Beat shuffled-future, raw-next, and 60-second aggregate-forecast controls on external transfer. | Reject for persistent gradient conflict, source/day identity, shortcut under time shuffle, or no external gain. |
 | M3-Ego | Replace flat history with causal endpoint-ego history | Positive context main effect and positive hybrid×ego interaction. | Reject if random, time/feature-matched, or CMES grouping matches it. |
 | M4-Rel | Add directed identity-free endpoint relation bias | Beat no-bias and CMES-Causal; pass relation destruction and endpoint-renaming tests. | Reject if identity is required, relation is unused, or endpoint-held-out performance falls. |
@@ -156,7 +168,7 @@ claimed overlap are governed by
 
 ### Classical-parity discriminator
 
-M0 clears the classical gate only when all three conditions hold at `k=10`
+M0 Matched clears the classical gate only when all three conditions hold at `k=10`
 labelled support groups per class against the best applicable classical model:
 at least 1.0 absolute macro one-vs-rest AUPRC point improvement; paired
 hierarchical-bootstrap 95% lower bound above zero; and TPR at 10 false alerts

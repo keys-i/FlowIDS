@@ -77,6 +77,14 @@ preprocessing on training data only, and checks causal state/context at every
 split boundary. See [Exploration](Architecture.md#exploration) and
 [M0 implementation](Architecture.md#m0-implementation).
 
+M0 then runs three supervised references under the same fields and evaluation:
+M0 Base (25M unrestricted FlowTransformer-style model), M0 Small (eight-flow
+causal), and M0 Matched (25M causal matched to Base except mask). Base is a
+PyTorch model, not the exact official implementation. The causal result
+remains a hypothesis until these models are compared under the matched
+evaluation contract. Promoted M0 is M0 Matched. The later 25M S0→S4 ladder
+remains reserved for promoted SSL work.
+
 ## Evaluation and leakage contract
 
 The primary result is inductive: pretraining uses source partitions only, with
@@ -181,7 +189,7 @@ labels exactly once after freezing all choices.
 | Time | Work packages | Exit decision |
 |---|---|---|
 | Months 1–2 | Exploration: schema/labels, time order, missingness, duplicates, field selection, and evaluation decisions. | Record benchmark limits; do not overstate the result. |
-| Month 3 | M0 under `src`: splits, train-only preprocessing, and causal-state/context checks; historical/classical controls. | Apply the [classical-parity discriminator](Model.md#classical-parity-discriminator); stop Transformer/SSL progression if it fails. |
+| Month 3 | M0 under `src`: splits, train-only preprocessing, causal-state/context checks, M0 Base (25M unrestricted FlowTransformer-style model), M0 Small (eight-flow causal model), and M0 Matched (25M causal model matched to Base except the mask). Promoted M0 is M0 Matched. | Compare all three only under the matched contract; the causal result is a hypothesis until then. Apply the [classical-parity discriminator](Model.md#classical-parity-discriminator); stop Transformer/SSL progression if it fails. |
 | Months 4–5 | Constituent screen and M1-R/M1-L confirmation. | Stop SSL if neither constituent has external low-label signal. |
 | Months 6–7 | Hybrid/future and ego factorial/confirmation. | Retain only hybrid evidence beyond constituents; reject ego if matched history suffices. |
 | Month 8 | Relation study and year-one acceptance across binary, family, and available H3 probes. | Report a positive or negative H1/H2 and hybrid/ego result. |

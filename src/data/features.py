@@ -1,4 +1,4 @@
-"""M0's fixed NF3 columns and deployable feature view."""
+"""Define M0's fixed NF3 columns and deployable feature view."""
 
 START_TIME = "FLOW_START_MILLISECONDS"
 END_TIME = "FLOW_END_MILLISECONDS"

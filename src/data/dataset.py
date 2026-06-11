@@ -1,3 +1,5 @@
+"""Expose preprocessed causal NetFlow contexts as PyTorch batches."""
+
 from __future__ import annotations
 
 import math
@@ -39,6 +41,7 @@ class FlowDataset(Dataset[dict[str, Tensor]]):
         contexts: pl.DataFrame,
         horizon_minutes: int,
     ) -> None:
+        """Create a dataset from ordered events and their context metadata."""
         if horizon_minutes <= 0:
             raise ValueError("horizon_minutes must be positive")
         required = {
@@ -102,10 +105,12 @@ class FlowDataset(Dataset[dict[str, Tensor]]):
         self.labels = torch.tensor(labels.to_numpy(), dtype=torch.int64)
 
     def __len__(self) -> int:
+        """Return the number of scorable target flows."""
         return len(self.starts)
 
     @override
     def __getitem__(self, index: int) -> dict[str, Tensor]:
+        """Return one variable-length causal flow context."""
         start = int(self.starts[index])
         end = int(self.ends[index])
         return {
@@ -118,6 +123,7 @@ class FlowDataset(Dataset[dict[str, Tensor]]):
 
 
 def _elapsed(events: pl.DataFrame, limit: int) -> Tensor:
+    """Calculate clipped elapsed-time features for ordered flow events."""
     values: list[tuple[float, float]] = []
     group: tuple[object, object] | None = None
     previous: int | None = None
@@ -164,6 +170,7 @@ def _elapsed(events: pl.DataFrame, limit: int) -> Tensor:
 
 
 def collate(samples: Sequence[dict[str, Tensor]]) -> dict[str, Tensor]:
+    """Left-pad flow contexts into one causal batch."""
     if not samples:
         raise ValueError("cannot collate an empty batch")
 
@@ -171,6 +178,7 @@ def collate(samples: Sequence[dict[str, Tensor]]) -> dict[str, Tensor]:
     width = int(lengths.max())
 
     def pad(name: str, value: float | int | bool = 0) -> Tensor:
+        """Left-pad one tensor field across all samples."""
         tail = samples[0][name].shape[1:]
         output = torch.full(
             (len(samples), width, *tail),

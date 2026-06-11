@@ -2,7 +2,10 @@ line-length = 100
 target-version = "py313"
 
 [lint]
-select = ["E", "F", "I"]
+select = ["D", "E", "F", "I"]
+
+[lint.pydocstyle]
+convention = "pep257"
 
 [format]
 quote-style = "double"

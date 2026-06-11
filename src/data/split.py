@@ -1,3 +1,5 @@
+"""Create leakage-resistant chronological NetFlow splits."""
+
 from __future__ import annotations
 
 import polars as pl
@@ -6,6 +8,7 @@ from src.data.features import END_TIME, PARTITION, RAW_COLUMNS, ROW, SCORE, TARG
 
 
 def _check(frame: pl.LazyFrame, *, train: float, validation: float, purge: int) -> list[str]:
+    """Validate split inputs and return raw fields for duplicate checks."""
     if not 0 < train < 1 or not 0 < validation < 1 or train + validation >= 1:
         raise ValueError("train and validation fractions must be positive and total less than one")
     if purge < 0:
@@ -19,6 +22,7 @@ def _check(frame: pl.LazyFrame, *, train: float, validation: float, purge: int) 
 
 
 def _score(frame: pl.LazyFrame, raw: list[str]) -> pl.LazyFrame:
+    """Mark flows that do not have conflicting duplicate labels."""
     if not raw:
         raise ValueError("no raw non-target columns available for duplicate grouping")
     conflict = pl.any_horizontal([pl.col(target).n_unique().over(raw).gt(1) for target in TARGETS])

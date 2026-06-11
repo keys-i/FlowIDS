@@ -1,3 +1,5 @@
+"""Run the repository's local development commands."""
+
 from __future__ import annotations
 
 import shutil
@@ -18,6 +20,7 @@ T = TypeVar("T")
 
 
 def run(*command: str | Path) -> None:
+    """Run a command from the repository root."""
     _ = subprocess.run(command, cwd=ROOT, check=True)
 
 
@@ -25,6 +28,7 @@ fmt = lambda: run("ruff", "format", ".", "--config", RUFF)  # noqa: E731
 
 
 def clean() -> None:
+    """Remove local build and Python cache files."""
     paths = {
         ROOT / name
         for name in (
@@ -53,12 +57,15 @@ def clean() -> None:
 
 
 def lint() -> None:
+    """Run formatting, linting, and static type checks."""
     run("ruff", "format", "--check", ".", "--config", RUFF)
     run("ruff", "check", ".", "--config", RUFF)
     run("basedpyright", "--project", BASEDPYRIGHT)
+    run(sys.executable, "-m", "src.model.check")
 
 
 def choose(prompt: str, options: list[T]) -> T:
+    """Return an interactively selected option."""
     print(f"\n{prompt}")
     for index, option in enumerate(options, 1):
         print(f"  {index}. {option}")
@@ -71,6 +78,7 @@ def choose(prompt: str, options: list[T]) -> T:
 
 
 def config_name(path: Path) -> str:
+    """Return a model-menu label from a TOML configuration."""
     with path.open("rb") as file:
         description = tomllib.load(file).get("description")
     if not isinstance(description, str) or not description.strip():
@@ -79,6 +87,7 @@ def config_name(path: Path) -> str:
 
 
 def model() -> None:
+    """Choose a model configuration and action, then run it."""
     paths = sorted(path for path in CONFIG.glob("*.toml") if path.name not in MODEL_IGNORE)
     configs = {config_name(path): path for path in paths}
     if not configs:

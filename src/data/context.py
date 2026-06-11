@@ -1,3 +1,5 @@
+"""Build causal context metadata for ordered NetFlow events."""
+
 from __future__ import annotations
 
 from collections import deque

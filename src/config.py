@@ -1,3 +1,5 @@
+"""Load TOML configuration into attribute-accessible namespaces."""
+
 from __future__ import annotations
 
 import tomllib
@@ -11,7 +13,10 @@ type TomlValue = (
 
 
 class Config(SimpleNamespace):
+    """Expose nested TOML tables through attributes."""
+
     def __init__(self, values: dict[str, TomlValue]) -> None:
+        """Build a configuration namespace from TOML values."""
         super().__init__(
             {
                 key: Config(value) if isinstance(value, dict) else value
@@ -20,6 +25,7 @@ class Config(SimpleNamespace):
         )
 
     @classmethod
-    def load(cls, path: str | Path = "tools/config/m0.toml") -> Config:
+    def load(cls, path: str | Path = "tools/config/m0.matched.toml") -> Config:
+        """Load configuration from a TOML file."""
         with Path(path).open("rb") as file:
             return cls(tomllib.load(file))

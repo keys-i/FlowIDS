@@ -1,5 +1,8 @@
+"""Fit and apply M0 NetFlow feature preprocessing."""
+
 from __future__ import annotations
 
+import math
 from typing import TypedDict
 
 import polars as pl
@@ -22,6 +25,8 @@ PORT_BUCKET_START = 1027
 
 
 class State(TypedDict):
+    """Store preprocessing statistics and categorical encodings."""
+
     numeric: dict[str, dict[str, float]]
     categorical: dict[str, dict[str, int]]
     ports: dict[str, dict[str, int]]
@@ -29,8 +34,14 @@ class State(TypedDict):
 
 
 def _iat_missing() -> pl.Expr:
+    """Mark incomplete or invalid inter-arrival-time statistics."""
     src_min, src_max, src_avg, src_std, dst_min, dst_max, dst_avg, dst_std = IAT_COLUMNS
-    return pl.any_horizontal([pl.col(column).is_null() for column in IAT_COLUMNS]) | (
+    return pl.any_horizontal(
+        [
+            pl.col(column).is_null() | ~pl.col(column).cast(pl.Float64, strict=False).is_finite()
+            for column in IAT_COLUMNS
+        ]
+    ) | (
         (pl.col(src_min) > pl.col(src_avg))
         | (pl.col(src_avg) > pl.col(src_max))
         | (pl.col(dst_min) > pl.col(dst_avg))
@@ -41,17 +52,23 @@ def _iat_missing() -> pl.Expr:
 
 
 def _numeric(column: str) -> pl.Expr:
+    """Return a numeric column expression with invalid IATs removed."""
     value = pl.col(column).cast(pl.Float64, strict=False)
+    value = pl.when(value.is_finite()).then(value).otherwise(None)
     return pl.when(_iat_missing()).then(None).otherwise(value) if column in IAT_COLUMNS else value
 
 
-def _value(value: object) -> float:
-    if not isinstance(value, int | float):
-        raise ValueError("numeric preprocessing statistics must be numbers")
+def _value(value: object, default: float | None = None) -> float:
+    """Convert one numeric aggregate to a Python float."""
+    if value is None and default is not None:
+        return default
+    if not isinstance(value, int | float) or not math.isfinite(value):
+        raise ValueError("numeric preprocessing statistics must be finite numbers")
     return float(value)
 
 
 def _stats(frame: pl.LazyFrame, columns: list[str]) -> dict[str, dict[str, float]]:
+    """Calculate train-only numeric imputation and clipping statistics."""
     expressions: list[pl.Expr] = []
     for column in columns:
         value = _numeric(column)
@@ -66,7 +83,7 @@ def _stats(frame: pl.LazyFrame, columns: list[str]) -> dict[str, dict[str, float
         )
     row = frame.select(expressions).collect().row(0, named=True)
     return {
-        column: {name: _value(row[f"{column}:{name}"]) for name in ("median", "low", "high")}
+        column: {name: _value(row[f"{column}:{name}"], 0.0) for name in ("median", "low", "high")}
         for column in columns
     }
 
@@ -93,8 +110,8 @@ def fit(train: pl.LazyFrame) -> State:
     row = train.select(expressions).collect().row(0, named=True)
     for column in numeric:
         stats = numeric_stats[column]
-        stats["mean"] = _value(row[f"{column}:mean"])
-        std = _value(row[f"{column}:std"])
+        stats["mean"] = _value(row[f"{column}:mean"], 0.0)
+        std = _value(row[f"{column}:std"], 0.0)
         stats["std"] = std if std else 1.0
 
     vocabularies = {
@@ -143,6 +160,7 @@ def fit(train: pl.LazyFrame) -> State:
 
 
 def _port(column: str, buckets: dict[str, int]) -> list[pl.Expr]:
+    """Encode a port column and its registered or dynamic range."""
     text = pl.col(column).cast(pl.String)
     value = pl.col(column).cast(pl.Int64, strict=False)
     ids = (

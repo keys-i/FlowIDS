@@ -32,6 +32,7 @@ COMPRESSIONS: tuple[Compression, ...] = (
 
 
 def human_size(size: int) -> str:
+    """Format a byte count for display."""
     return next(
         f"{size / 1024**power:.2f} {unit}"
         for power, unit in enumerate(("B", "KB", "MB", "GB", "TB"))
@@ -40,6 +41,7 @@ def human_size(size: int) -> str:
 
 
 def expand(raw: str) -> list[Path]:
+    """Expand one CSV path, directory, or glob."""
     path = Path(raw)
     if glob.has_magic(raw):
         return [Path(match) for match in glob.glob(raw, recursive=True)]
@@ -47,6 +49,7 @@ def expand(raw: str) -> list[Path]:
 
 
 def resolve_inputs(raw_inputs: tuple[str, ...]) -> list[Path]:
+    """Return unique CSV files selected by command-line inputs."""
     return sorted(
         {
             path.resolve()
@@ -58,6 +61,7 @@ def resolve_inputs(raw_inputs: tuple[str, ...]) -> list[Path]:
 
 
 def destination(source: Path, output: Path, sources: list[Path]) -> Path:
+    """Return the Parquet destination for one source file."""
     output = output.resolve()
     if len(sources) == 1:
         return (
@@ -79,6 +83,7 @@ def convert(
     infer_schema_length: int,
     overwrite: bool,
 ) -> tuple[str, Path, int, int]:
+    """Convert one CSV source to Parquet atomically."""
     input_size = source.stat().st_size
     if output.exists() and not overwrite:
         return "skipped", output, input_size, output.stat().st_size
@@ -141,6 +146,7 @@ def main(
     infer_schema_length: int,
     quiet: bool,
 ) -> None:
+    """Convert selected CSV files to Parquet."""
     if infer_schema_length <= 0:
         raise click.BadParameter("must be positive", param_hint="--infer-schema-length")
 

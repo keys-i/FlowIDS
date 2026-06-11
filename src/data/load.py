@@ -1,4 +1,4 @@
-"""Lazy NF3 source loading."""
+"""Load configured NF3 sources lazily."""
 
 from __future__ import annotations
 

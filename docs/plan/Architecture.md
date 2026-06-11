@@ -23,6 +23,12 @@ At the M0 implementation stage, code under `src` constructs evaluation splits,
 fits preprocessing on training data only, checks causal context and state
 behaviour, and records the checkpoint details needed by the implementation.
 
+**M0 Small** is causal with seven earlier completed flows plus its target, for
+eight tokens. **M0 Base** is the unrestricted 25M offline model with up to 255
+earlier completed flows plus its target, for 256 tokens. **M0 Matched** is the
+causal 25M/256-token model. It has the same parameterization as M0 Base except
+for its attention mask. Promoted M0 and every later rung mean M0 Matched.
+
 ## Prediction unit and feature view
 
 The prediction unit is one completed bidirectional flow. A unidirectional
@@ -56,15 +62,18 @@ missingness indicator, `log1p` for non-negative heavy-tailed fields, 1st/99th
 percentile clipping, then z-score scaling. Categorical vocabularies and port
 buckets are training-only. Time is clipped `log1p` elapsed time since the
 preceding observed flow and preceding flow sharing either endpoint; wall-clock
-and absolute capture time are forbidden.
+and absolute capture time are forbidden. These elapsed values remain batch
+fields reserved for later ablation; M0 does not project or otherwise consume
+them.
 
 ## Context and relations
 
-Every context contains at most 255 earlier completed flows and the completed
-target, appended last. Context uses a selected 1-, 10-, or 60-minute horizon;
-equal completion times have a deterministic tie-break. M0 defines partition
-boundaries and resets state at each boundary. Future data, padding, labels, raw
-identifiers, and post-hoc fields must not affect the encoder input.
+M0 Base and M0 Matched contexts contain at most 255 earlier completed flows and
+the completed target, appended last. Context uses a selected 1-, 10-, or
+60-minute horizon; equal completion times have a deterministic tie-break. M0
+defines partition boundaries and resets state at each boundary. Future data,
+padding, labels, raw identifiers, and post-hoc fields must not affect the
+encoder input.
 
 M0--M2-F use the latest 255 eligible collector events. M3-Ego takes the latest
 128 eligible events incident to the target source and the latest 128 incident
@@ -85,9 +94,9 @@ held and unheld endpoint are purged; the rest are training. Test context uses
 only its own earlier completed flows.
 
 Offline replay and streaming construction must produce identical event order,
-padding, causal masks, relation types, and elapsed-time features. State expires
-at the selected horizon and is cleared at adaptation, calibration, and test
-boundaries.
+padding, causal masks, relation types, and elapsed-time batch fields. State
+expires at the selected horizon and is cleared at adaptation, calibration, and
+test boundaries.
 
 Semantic group masking is distinct from missingness and padding. The groups
 are transport/flags, service/ports, directional volume, packet-size and
@@ -107,8 +116,22 @@ strata.
 One completed flow is one token. The record encoder, Transformer shape,
 parameter accounting, objectives, and removal of SSL heads are defined once in
 [Model](Model.md#locked-deployable-backbone). The final completed-flow state
-feeds downstream heads. Bidirectional models are offline-oracle upper bounds,
-not deployable equivalents.
+feeds downstream heads.
+
+M0 Base and M0 Matched have the same factorized encoder, post-LN Transformer,
+no positional signal, downstream head, fields, context length, and training
+contract. The factorized numeric projection plus categorical lookup tables is
+mathematically equivalent to a concatenated one-hot linear projection for valid
+categories under this project's PAD/UNK/missing scheme, but is not the official
+FlowTransformer implementation. The sole architectural difference is attention
+masking: M0 Matched uses the causal mask; M0 Base uses unrestricted attention
+and is offline-only. M0 Matched has no RoPE and no learned elapsed-time
+projection.
+
+The 25M match applies only to M0 Base and M0 Matched: their complete trainable
+classifier, including factorized encoder, Transformer, and head, must be within
+±5% parameters. M0 Small deliberately keeps its project-selected scale and is
+not a capacity-matched comparator.
 
 Primary scoring occurs at flow completion, from that flow and strictly earlier
 completed flows. Live packet-prefix scoring is out of scope unless a suitable
