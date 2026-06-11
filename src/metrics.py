@@ -1,4 +1,4 @@
-"""Compute M0 evaluation metrics."""
+"""Compute M0 binary classification and calibration metrics"""
 
 from __future__ import annotations
 
@@ -7,7 +7,22 @@ from torch import Tensor
 
 
 def binary(labels: Tensor, probability: Tensor, bins: int = 15) -> dict[str, float | int | None]:
-    """Return empirical binary classification and calibration metrics."""
+    """Compute binary ranking, calibration, and low-FPR metrics
+
+    Args:
+        labels: Nonempty binary tensor shaped (n,)
+        probability: Finite floating-point scores in [0, 1], on the same device
+        bins: Positive number of equal-width ECE bins
+
+    Returns:
+        Average precision, tie-correct AUROC, TPR at fixed FPRs, NLL, Brier,
+        ECE, and class counts. Average precision uses the empirical step sum
+        TPR is None if a class is absent or the budget permits less than one
+        observed false positive; AUROC/AP are None when their classes are absent
+
+    Raises:
+        ValueError: If shapes, devices, values, or bin count are invalid
+    """
     if (
         labels.ndim != 1
         or probability.ndim != 1
@@ -29,37 +44,42 @@ def binary(labels: Tensor, probability: Tensor, bins: int = 15) -> dict[str, flo
     target = labels[ranked].to(torch.int64)
     positives = int(target.sum())
     negatives = len(target) - positives
-    starts = [
-        int(index)
-        for index in (
-            torch.cat(
-                (torch.ones(1, device=score.device, dtype=torch.bool), score[1:] != score[:-1])
-            )
-            .nonzero()
-            .flatten()
-        )
-    ]
-    starts.append(len(target))
-
-    true_positive = false_positive = 0
-    average_precision = 0.0
-    auroc_wins = 0.0
-    points: list[tuple[int, int]] = []
-    for start, end in zip(starts, starts[1:]):
-        group_positive = int(target[start:end].sum())
-        group_negative = end - start - group_positive
-        if positives:
-            true_positive += group_positive
-            average_precision += group_positive / positives * true_positive / end
-        auroc_wins += group_positive * (negatives - false_positive - group_negative / 2)
-        false_positive += group_negative
-        points.append((true_positive, false_positive))
+    ends = torch.nonzero(
+        torch.cat((score[1:] != score[:-1], torch.ones(1, device=score.device, dtype=torch.bool)))
+    ).flatten()
+    positions = ends + 1
+    true_positive = target.cumsum(0)[ends]
+    false_positive = positions - true_positive
+    group_positive = torch.diff(
+        true_positive, prepend=torch.zeros(1, device=score.device, dtype=torch.int64)
+    )
+    group_negative = torch.diff(
+        false_positive, prepend=torch.zeros(1, device=score.device, dtype=torch.int64)
+    )
+    previous_false_positive = false_positive - group_negative
+    tp = true_positive.to(torch.float64)
+    fp = false_positive.to(torch.float64)
+    group_pos = group_positive.to(torch.float64)
+    group_neg = group_negative.to(torch.float64)
+    previous_fp = previous_false_positive.to(torch.float64)
+    rank = positions.to(torch.float64)
+    average_precision = float((group_pos * tp / rank).sum() / positives) if positives else 0.0
+    auroc_wins = float((group_pos * (negatives - previous_fp - group_neg / 2)).sum())
 
     def tpr(limit: float) -> float | None:
-        """Return the best empirical TPR within a false-positive-rate limit."""
+        """Return the best empirical TPR within a false-positive-rate limit
+
+        Args:
+            limit: Maximum false-positive rate
+
+        Returns:
+            The best TPR at a score-tie boundary, or `None` when a class is
+            absent or `limit` permits fewer than one observed false positive
+        """
         if not positives or not negatives or limit * negatives < 1:
             return None
-        return max((tp / positives for tp, fp in points if fp <= limit * negatives), default=0.0)
+        eligible = tp[fp <= limit * negatives]
+        return float(eligible.max() / positives) if eligible.numel() else 0.0
 
     epsilon = torch.finfo(probability.dtype).eps
     clipped = probability.clamp(epsilon, 1 - epsilon)
@@ -70,18 +90,13 @@ def binary(labels: Tensor, probability: Tensor, bins: int = 15) -> dict[str, flo
         ).mean()
     )
     brier = float(((probability - labels.to(probability.dtype)) ** 2).mean())
-    ece = 0.0
-    for index in range(bins):
-        lower = index / bins
-        in_bin = (probability >= lower) & (
-            probability <= (index + 1) / bins
-            if index == bins - 1
-            else probability < (index + 1) / bins
-        )
-        if in_bin.any():
-            confidence = float(probability[in_bin].mean())
-            accuracy = float(labels[in_bin].to(probability.dtype).mean())
-            ece += float(in_bin.to(probability.dtype).mean()) * abs(accuracy - confidence)
+    bin_index = torch.clamp((probability * bins).to(torch.int64), max=bins - 1)
+    counts = torch.bincount(bin_index, minlength=bins)
+    confidence = torch.bincount(bin_index, weights=probability, minlength=bins)
+    accuracy = torch.bincount(bin_index, weights=labels.to(probability.dtype), minlength=bins)
+    nonempty = counts > 0
+    bin_error = (accuracy[nonempty] - confidence[nonempty]).abs() / counts[nonempty]
+    ece = float((counts[nonempty].to(probability.dtype) / len(target) * bin_error).sum())
 
     return {
         "auprc": average_precision if positives else None,
@@ -98,3 +113,29 @@ def binary(labels: Tensor, probability: Tensor, bins: int = 15) -> dict[str, flo
         "positives": positives,
         "negatives": negatives,
     }
+
+
+if __name__ == "__main__":
+    cases = (
+        ([1, 0, 1, 0], [0.9, 0.9, 0.1, 0.1], {"auprc": 0.5, "auroc": 0.5}),
+        ([1, 0], [0.5, 0.5], {"auprc": 0.5, "auroc": 0.5}),
+        ([1, 0], [0.9, 0.1], {"auprc": 1.0, "auroc": 1.0}),
+        ([1, 0], [0.1, 0.9], {"auprc": 0.5, "auroc": 0.0}),
+        ([0, 0], [0.1, 0.9], {"auprc": None, "auroc": None}),
+        ([1, 1], [0.1, 0.9], {"auprc": 1.0, "auroc": None}),
+    )
+    for labels, score, expected in cases:
+        result = binary(torch.tensor(labels), torch.tensor(score))
+        for name, value in expected.items():
+            assert result[name] == value, (name, result[name], value)
+    try:
+        _ = binary(torch.tensor([0]), torch.tensor([1.1]))
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("invalid probabilities must fail")
+    limited = binary(torch.tensor([1] + [0] * 10_000), torch.tensor([1.0] + [0.0] * 10_000))
+    assert limited["tpr_at_fpr_1e-4"] == 1.0
+    assert limited["tpr_at_fpr_1e-3"] == 1.0
+    unresolved = binary(torch.tensor([1] + [0] * 9_999), torch.tensor([1.0] + [0.0] * 9_999))
+    assert unresolved["tpr_at_fpr_1e-4"] is None

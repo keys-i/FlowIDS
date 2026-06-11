@@ -1,4 +1,4 @@
-"""Define M0's fixed NF3 columns and deployable feature view."""
+"""Define the fixed NF3 input columns and M0 feature groups"""
 
 START_TIME = "FLOW_START_MILLISECONDS"
 END_TIME = "FLOW_END_MILLISECONDS"
@@ -8,7 +8,7 @@ EVENT = "event_id"
 PARTITION = "partition"
 SCORE = "score"
 
-AUDIT_COLUMNS = (
+TIME_COLUMNS = (
     START_TIME,
     END_TIME,
 )
@@ -111,7 +111,7 @@ HEAVY_TAIL_COLUMNS = (
 )
 
 RAW_COLUMNS = (
-    *AUDIT_COLUMNS,
+    *TIME_COLUMNS,
     *ROUTING_COLUMNS,
     *CATEGORICAL_COLUMNS,
     *NUMERIC_COLUMNS,

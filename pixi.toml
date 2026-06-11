@@ -11,6 +11,7 @@ polars = "*"
 rich = "*"
 basedpyright = "*"
 ruff = "0.16.*"
+matplotlib = ">=3.11.1,<4"
 
 [target.osx-arm64.dependencies]
 pytorch = "*"
@@ -23,5 +24,6 @@ convert = "python tools/scripts/convert.py"
 fmt = "python tools/scripts/tools.py fmt"
 clean = "python tools/scripts/tools.py clean"
 lint = "python tools/scripts/tools.py lint"
-model = "python tools/scripts/tools.py model"
+model = "python -m src.main"
+plot = "python tools/scripts/plot.py"
 check = { depends-on = ["fmt", "lint"] }

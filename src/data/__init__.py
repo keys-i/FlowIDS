@@ -1,1 +1,1 @@
-"""Prepare NetFlow data for M0 training and evaluation."""
+"""Prepare NF3 NetFlow records for M0 training and evaluation"""

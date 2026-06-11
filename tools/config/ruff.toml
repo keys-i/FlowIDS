@@ -3,6 +3,7 @@ target-version = "py313"
 
 [lint]
 select = ["D", "E", "F", "I"]
+ignore = ["D400"]
 
 [lint.pydocstyle]
 convention = "pep257"

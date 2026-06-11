@@ -1,4 +1,4 @@
-"""Fit and apply M0 NetFlow feature preprocessing."""
+"""Fit and apply train-only M0 NetFlow feature preprocessing"""
 
 from __future__ import annotations
 
@@ -8,7 +8,6 @@ from typing import TypedDict
 import polars as pl
 
 from src.data.features import (
-    AUDIT_COLUMNS,
     CATEGORICAL_COLUMNS,
     CONTEXT_COLUMNS,
     HEAVY_TAIL_COLUMNS,
@@ -16,6 +15,7 @@ from src.data.features import (
     NUMERIC_COLUMNS,
     ROUTING_COLUMNS,
     TARGET_COLUMNS,
+    TIME_COLUMNS,
 )
 
 PAD = 0
@@ -25,7 +25,7 @@ PORT_BUCKET_START = 1027
 
 
 class State(TypedDict):
-    """Store preprocessing statistics and categorical encodings."""
+    """Store the fitted feature statistics needed by `transform`"""
 
     numeric: dict[str, dict[str, float]]
     categorical: dict[str, dict[str, int]]
@@ -34,7 +34,7 @@ class State(TypedDict):
 
 
 def _iat_missing() -> pl.Expr:
-    """Mark incomplete or invalid inter-arrival-time statistics."""
+    """Mark incomplete, nonfinite, or internally inconsistent IAT statistics"""
     src_min, src_max, src_avg, src_std, dst_min, dst_max, dst_avg, dst_std = IAT_COLUMNS
     return pl.any_horizontal(
         [
@@ -52,14 +52,14 @@ def _iat_missing() -> pl.Expr:
 
 
 def _numeric(column: str) -> pl.Expr:
-    """Return a numeric column expression with invalid IATs removed."""
+    """Return a finite numeric expression with invalid IAT groups set missing"""
     value = pl.col(column).cast(pl.Float64, strict=False)
     value = pl.when(value.is_finite()).then(value).otherwise(None)
     return pl.when(_iat_missing()).then(None).otherwise(value) if column in IAT_COLUMNS else value
 
 
 def _value(value: object, default: float | None = None) -> float:
-    """Convert one numeric aggregate to a Python float."""
+    """Convert a collected numeric aggregate to a finite Python float"""
     if value is None and default is not None:
         return default
     if not isinstance(value, int | float) or not math.isfinite(value):
@@ -68,7 +68,7 @@ def _value(value: object, default: float | None = None) -> float:
 
 
 def _stats(frame: pl.LazyFrame, columns: list[str]) -> dict[str, dict[str, float]]:
-    """Calculate train-only numeric imputation and clipping statistics."""
+    """Calculate train-only median and one-to-99 percentile clipping values"""
     expressions: list[pl.Expr] = []
     for column in columns:
         value = _numeric(column)
@@ -89,7 +89,14 @@ def _stats(frame: pl.LazyFrame, columns: list[str]) -> dict[str, dict[str, float
 
 
 def fit(train: pl.LazyFrame) -> State:
-    """Fit portable M0 preprocessing on training flows only."""
+    """Fit numeric transforms and categorical IDs using training flows only
+
+    Args:
+        train: Training-period flows
+
+    Returns:
+        Imputation, clipping, scaling, vocabularies, port buckets, and kept columns
+    """
     names = set(train.collect_schema().names())
     numeric = [column for column in NUMERIC_COLUMNS if column in names]
     categorical = [column for column in CATEGORICAL_COLUMNS if column in names]
@@ -149,7 +156,7 @@ def fit(train: pl.LazyFrame) -> State:
         "keep": [
             column
             for column in (
-                *AUDIT_COLUMNS,
+                *TIME_COLUMNS,
                 *ROUTING_COLUMNS,
                 *TARGET_COLUMNS,
                 *CONTEXT_COLUMNS,
@@ -160,7 +167,7 @@ def fit(train: pl.LazyFrame) -> State:
 
 
 def _port(column: str, buckets: dict[str, int]) -> list[pl.Expr]:
-    """Encode a port column and its registered or dynamic range."""
+    """Encode a port into its identifier and registered or dynamic range"""
     text = pl.col(column).cast(pl.String)
     value = pl.col(column).cast(pl.Int64, strict=False)
     ids = (
@@ -191,7 +198,15 @@ def _port(column: str, buckets: dict[str, int]) -> list[pl.Expr]:
 
 
 def transform(frame: pl.LazyFrame, state: State) -> pl.LazyFrame:
-    """Apply a state fitted by :func:`fit` without retaining raw model features."""
+    """Apply fitted transforms without changing their statistics
+
+    Args:
+        frame: Flows with the fitted input columns
+        state: Values returned by fit
+
+    Returns:
+        Numeric values, missing flags, category IDs, and retained metadata
+    """
     numeric = state["numeric"]
     categorical = state["categorical"]
     ports = state["ports"]
