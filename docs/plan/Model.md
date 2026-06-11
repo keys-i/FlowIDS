@@ -106,11 +106,11 @@ horizons from $\{1,4,16\}$:
 
 $$
 L_{\mathrm{future}}(i)=\frac{1}{|H_i|}\sum_{h\in H_i}
-\left\|\operatorname{norm}\!\left(p(z_i+e_h)\right)-
-\operatorname{sg}\!\left(\operatorname{norm}(\bar z_{i,h})\right)\right\|_2^2.
+\left\|\mathrm{norm}\!\left(p(z_i+e_h)\right)-
+\mathrm{sg}\!\left(\mathrm{norm}(\bar z_{i,h})\right)\right\|_2^2.
 $$
 
-Here, $\operatorname{norm}(u)=u/(\lVert u\rVert_2+10^{-6})$. $e_h$ is a
+Here, $\mathrm{norm}(u)=u/(\lVert u\rVert_2+10^{-6})$. $e_h$ is a
 learned horizon embedding with the encoder width, $p$ is one shared two-layer
 predictor, and $\bar z_{i,h}$ is the mean of the same top four normalized EMA
 teacher layers used by $L_{\mathrm{latent}}$, taken from the $h$-th later flow
