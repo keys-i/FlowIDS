@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[2]
 CONFIG = ROOT / "tools" / "config"
 RUFF = CONFIG / "ruff.toml"
 BASEDPYRIGHT = CONFIG / "basedpyright.json"
-MODEL_IGNORE = {RUFF.name, BASEDPYRIGHT.name}
+MODEL_IGNORE = {RUFF.name, BASEDPYRIGHT.name, "slurm.toml"}
 
 T = TypeVar("T")
 

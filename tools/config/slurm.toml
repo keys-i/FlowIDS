@@ -1,0 +1,36 @@
+[cluster]
+# Replace this with the a_ group shown by `groups` on Bunya.
+account = "a_yourgroup"
+partition = "gpu_cuda"
+qos = "gpu"
+gres = "gpu:h100:1"
+constraint = "cuda80gb"
+nodes = 1
+ntasks_per_node = 1
+cpus_per_task = 8
+mem = "128G"
+time = "72:00:00"
+
+[environment]
+scratch_base = "/scratch/user/{user}/flowids"
+check_gpu = true
+launcher = ["srun"]
+
+[[jobs]]
+name = "flowids-m0"
+branch = "m0"
+workdir = "../.."
+configs = ["tools/config/m0.*.toml"]
+prepare = ["pixi", "install", "--frozen"]
+prepare_once = true
+command = [
+  "pixi",
+  "run",
+  "--frozen",
+  "python",
+  "-m",
+  "src.main",
+  "train",
+  "--config",
+  "{config}",
+]
