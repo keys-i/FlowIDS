@@ -18,7 +18,7 @@ The five existing DuckDB queries inspected the four local NF3 Parquet files:
 | NF-CSE-CIC-IDS2018-v3 | 20,115,529 | 87.0702% | 12.9298% |
 | NF-ToN-IoT-v3 | 27,520,260 | 61.0176% | 38.9824% |
 | NF-UNSW-NB15-v3 | 2,365,424 | 94.6017% | 5.3983% |
-| **Total** | **66,935,021** | — | — |
+| **Total** | **66,935,021** | n/a | n/a |
 
 All files expose 55 columns. Three columns disagree in physical type:
 `L7_PROTO`, `SRC_TO_DST_SECOND_BYTES`, and `DST_TO_SRC_SECOND_BYTES` are
