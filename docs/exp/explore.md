@@ -3,6 +3,20 @@
 **Status:** complete on 18 August 2026. This is a data report, not a model
 result.
 
+## What these findings mean
+
+- BoT-IoT is 99.6930% attacks. Calling every flow an attack gives 99.6930%
+  accuracy and flags every benign flow. This is arithmetic, not a model result.
+- Endpoint fields strongly track labels. A model could recognise the capture
+  instead of learning behaviour that transfers.
+- CIC has 440 duplicate groups with conflicting labels. Identical records
+  cannot provide an unambiguous scored target.
+
+These findings motivate the [input and split rules](../plan/Architecture.md).
+They do not show that endpoint history or pretraining works.
+
+## How the data was inspected
+
 The five existing DuckDB queries inspected the four local NF3 Parquet files:
 [profile](../../tools/scripts/exploration/profile.sql),
 [integrity](../../tools/scripts/exploration/integrity.sql),
@@ -18,7 +32,7 @@ The five existing DuckDB queries inspected the four local NF3 Parquet files:
 | NF-CSE-CIC-IDS2018-v3 | 20,115,529 | 87.0702% | 12.9298% |
 | NF-ToN-IoT-v3 | 27,520,260 | 61.0176% | 38.9824% |
 | NF-UNSW-NB15-v3 | 2,365,424 | 94.6017% | 5.3983% |
-| **Total** | **66,935,021** | — | — |
+| **Total** | **66,935,021** | n/a | n/a |
 
 All files expose 55 columns. Three columns disagree in physical type:
 `L7_PROTO`, `SRC_TO_DST_SECOND_BYTES`, and `DST_TO_SRC_SECOND_BYTES` are
@@ -32,7 +46,8 @@ view.
 
 No file has a missing target or timestamp, an invalid binary target, negative
 traffic, end-before-start time, duration mismatch, or invalid packet bound.
-Inter-arrival summaries are internally invalid on some rows:
+Inter-arrival time (IAT) summaries describe gaps between packets within a
+flow. They are internally invalid on some rows:
 
 | Dataset | Rows with invalid IAT summaries | Share |
 |---|---:|---:|
@@ -75,32 +90,36 @@ evaluation.
 
 ### Shortcut risk
 
-The five-tuple reduces label entropy by 0.968--1.000 across the four datasets;
-for the binary target the range is 0.442--0.998. Endpoint fingerprints are
-also close to deterministic in CIC and UNSW. Destination-port association is
-material in every dataset. These are dataset shortcuts, not learned network
-behaviour.
+The five-tuple's normalised association with attack-family labels is
+0.968–1.000 across the four datasets; for the binary target it is
+0.442–0.998. The query measures the fraction of label uncertainty explained
+within the inspected data: zero means no observed association and one means
+the feature determines the label in that sample. This is not held-out
+classification accuracy; high-cardinality fields can make the association
+look strong without predicting unseen examples.
+
+Endpoint fingerprints are also close to deterministic in CIC and UNSW.
+Destination-port association is material in every dataset. These observations
+flag possible shortcuts; grouped and chronological tests are needed to
+measure how much a trained model depends on them.
 
 The primary model therefore receives no raw addresses, endpoint identity,
 five-tuple, absolute time, capture/day identifiers, or `L7_PROTO`. Ports keep
 the restricted representation in
-[Architecture](../plan/Architecture.md#prediction-unit-and-feature-view), and
+[Architecture](../plan/Architecture.md#prediction-unit-and-input-features), and
 a port-free result is mandatory.
 
 ## M0 decisions
 
-1. Use NF-UNSW-NB15, BoT-IoT, and ToN-IoT for development.
-2. Keep NF-CSE-CIC-IDS2018 out of training and tuning. It is held out, not
-   sealed, because this exploration inspected its labels and distributions.
-3. Build chronological and group-separated splits under `src`; never use a
+1. Current M0–M2 runs use NF-CSE-CIC-IDS2018-v3 only. The other NF3 files remain exploration
+   evidence, not training or holdout data for this baseline.
+2. Build chronological and group-separated splits in `src/data/load.py`; never use a
    random row split.
-4. Fit imputation, scaling, vocabularies, port buckets, and all other learned
+3. Fit imputation, scaling, vocabularies, port buckets, and all other learned
    preprocessing on training data only.
-5. Keep exact duplicate groups within one partition and handle CIC's label
-   conflicts explicitly.
-6. Use the primary fields and causal context defined in
-   [Architecture](../plan/Architecture.md), then evaluate with the metrics and
-   label budgets in [Thesis](../plan/Thesis.md#evaluation-and-leakage-contract).
+4. Use the implemented M0 fields and context. The later ladder's input and
+   evaluation rules remain separate plans.
 
-Exploration is complete. The next stage is M0; these results do not establish
+Exploration is complete. M0–M2 are configured for NF-CSE-CIC-IDS2018-v3;
+full-data model runs remain unverified. The exploration results do not establish
 transfer, operational generalisation, or a foundation model.
