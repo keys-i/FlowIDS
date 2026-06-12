@@ -1,4 +1,4 @@
-"""Train or evaluate M0 models."""
+"""Train and evaluate flow encoders on one NF3 dataset"""
 
 from __future__ import annotations
 
@@ -9,25 +9,25 @@ from pathlib import Path
 
 import polars as pl
 import torch
-from torch.utils.data import ConcatDataset, DataLoader
+from torch.utils.data import DataLoader
 
 from src.config import Config
-from src.data.context import build
-from src.data.dataset import CATEGORICAL, FlowDataset, collate
-from src.data.features import NUMERIC_COLUMNS, PARTITION, SCORE
-from src.data.load import load
-from src.data.preprocess import PORT_BUCKET_START, State, transform
+from src.data.dataset import collate, make_datasets, make_loader, vocabulary_sizes
+from src.data.features import NUMERIC_COLUMNS, PARTITION
+from src.data.load import load_split
+from src.data.preprocess import State
 from src.data.preprocess import fit as fit_preprocess
-from src.data.split import chronological, holdout
-from src.eval import evaluate
+from src.m0.network import FlowTransformer
+from src.m1.network import Pretrainer
+from src.m2.data import HORIZONS, FutureDataset
+from src.m2.network import M2Pretrainer
 from src.metrics import binary
-from src.model.network import FlowTransformer
-from src.obases import always_benign
-from src.train import fit
+from src.pretrain import pretrain
+from src.train import evaluate, fit
 
 
-def _device(name: str) -> torch.device:
-    """Resolve the configured accelerator or choose the best local device."""
+def choose_device(name: str) -> torch.device:
+    """Resolve an explicit device, or try CUDA, MPS, then CPU for ``auto``"""
     if name != "auto":
         return torch.device(name)
     if torch.cuda.is_available():
@@ -37,210 +37,200 @@ def _device(name: str) -> torch.device:
     return torch.device("cpu")
 
 
-def _seed(value: int) -> None:
-    """Set the local random seeds used by M0."""
+def seed_all(value: int) -> None:
+    """Seed Python and PyTorch without promising deterministic GPU kernels"""
     _ = random.seed(value)
     _ = torch.manual_seed(value)
     if torch.cuda.is_available():
         _ = torch.cuda.manual_seed_all(value)
 
 
-def _sizes(state: State) -> list[int]:
-    """Derive record-encoder vocabulary sizes from the fitted state."""
-    sizes: list[int] = []
-    for column in CATEGORICAL:
-        if column.endswith("_range"):
-            sizes.append(5)
-        elif column.removesuffix("_id") in state["ports"]:
-            values = state["ports"][column.removesuffix("_id")].values()
-            sizes.append(max((PORT_BUCKET_START + 7, *values)) + 1)
-        else:
-            values = state["categorical"][column.removesuffix("_id")].values()
-            sizes.append(max((2, *values)) + 1)
-    return sizes
-
-
-def _loader(
-    datasets: list[FlowDataset],
-    config: Config,
-    *,
-    shuffle: bool,
-    device: torch.device,
-) -> DataLoader[dict[str, torch.Tensor]]:
-    """Combine source partitions into one M0 loader."""
-    if not datasets:
-        raise ValueError("no scorable flows remain after splitting")
-    return DataLoader(
-        ConcatDataset(datasets),
-        batch_size=config.data.batch_size,
-        shuffle=shuffle,
-        num_workers=config.data.workers,
-        persistent_workers=config.data.workers > 0,
-        pin_memory=device.type == "cuda",
-        collate_fn=collate,
-    )
-
-
-def _model(config: Config, state: State) -> FlowTransformer:
-    """Build the configured model on the shared feature view."""
-    sizes = _sizes(state)
-    if config.model.kind == "base":
-        return FlowTransformer(config, len(NUMERIC_COLUMNS), sizes, causal=False)
-    if config.model.kind in {"small", "matched"}:
-        return FlowTransformer(config, len(NUMERIC_COLUMNS), sizes, causal=True)
-    raise ValueError("model.kind must be base, small, or matched")
-
-
-def _partitions(
-    frames: dict[str, pl.LazyFrame],
-    state: State,
-    config: Config,
-    names: tuple[str, ...],
-) -> dict[str, list[FlowDataset]]:
-    """Transform each source and build contexts separately for every partition."""
-    output: dict[str, list[FlowDataset]] = {name: [] for name in names}
-    for frame in frames.values():
-        events = transform(frame.filter(pl.col(PARTITION).is_in(names)), state).collect()
-        for name in output:
-            partition = events.filter(pl.col(PARTITION) == name)
-            if partition.height and partition.filter(pl.col(SCORE)).height:
-                contexts = build(partition, config.data.horizon_minutes, config.data.max_events)
-                output[name].append(FlowDataset(partition, contexts, config.data.horizon_minutes))
-    return output
-
-
-def _development(config: Config) -> tuple[dict[str, pl.LazyFrame], pl.LazyFrame]:
-    """Load and chronologically divide only the configured development sources."""
-    frames = load(config)
-    development = {
-        source: chronological(
-            frames[source],
-            config.split.train_fraction,
-            config.split.validation_fraction,
-            config.split.purge_minutes,
-        )
-        for source in config.data.development
-    }
-    train = pl.concat(
-        [frame.filter(pl.col(PARTITION) == "train") for frame in development.values()]
-    )
-    return development, train
-
-
-def _save(path: Path, value: object) -> None:
-    """Write a small JSON artifact with stable formatting."""
+def save_json(path: Path, value: object) -> None:
+    """Write a JSON artifact, rejecting non-finite numbers"""
     _ = path.write_text(json.dumps(value, indent=2, allow_nan=False) + "\n")
 
 
-def _contract(config: Config) -> dict[str, object]:
-    """Return the small set of settings that must match at evaluation."""
-    model: dict[str, object] = {"kind": config.model.kind}
-    model.update(
-        {
-            "d_model": config.model.d_model,
-            "layers": config.model.layers,
-            "heads": config.model.heads,
-            "ffn": config.model.ffn,
-            "dropout": config.model.dropout,
-        }
-    )
+def input_settings(config: Config) -> dict[str, object]:
+    """Record the input and architecture settings needed to reload weights"""
     return {
-        "sources": {"development": list(config.data.development), "holdout": config.data.holdout},
+        "dataset": config.data.dataset,
         "context": {
             "horizon_minutes": config.data.horizon_minutes,
             "max_events": config.data.max_events,
         },
-        "split": {
-            "train_fraction": config.split.train_fraction,
-            "validation_fraction": config.split.validation_fraction,
-            "purge_minutes": config.split.purge_minutes,
-        },
-        "model": model,
+        "split": vars(config.split),
+        "model": vars(config.model),
     }
 
 
-def train(config: Config) -> None:
-    """Train a model without including the configured holdout source."""
-    _seed(config.run.seed)
-    device = _device(config.run.device)
-    output = Path(config.run.output)
-    output.mkdir(parents=True, exist_ok=True)
+def run(config: Config, *, evaluate_only: bool = False) -> None:
+    """Prepare one dataset, train the chosen model, and write test results
 
-    development, train_frame = _development(config)
-    state = fit_preprocess(train_frame)
-    partitions = _partitions(development, state, config, ("train", "validation"))
-    model = _model(config, state).to(device)
-    history, best_state = fit(
-        model,
-        _loader(partitions["train"], config, shuffle=True, device=device),
-        _loader(partitions["validation"], config, shuffle=False, device=device),
-        config,
-        device,
-    )
-    torch.save(
-        {
-            "contract": _contract(config),
-            "model": best_state,
+    Args:
+        config: Model, data, optimizer, and output settings
+        evaluate_only: Load saved weights and preprocessing instead of training
+    """
+    seed_all(config.run.seed)
+    device = choose_device(config.run.device)
+    output = Path(config.run.output)
+    print(f"{config.model.kind} on {device}: loading {config.data.dataset}")
+    frame = load_split(config)
+    state: State
+    if evaluate_only:
+        checkpoint = torch.load(output / "model.pt", map_location="cpu", weights_only=True)
+        if checkpoint["settings"] != input_settings(config):
+            raise ValueError("checkpoint settings do not match the configuration")
+        state = checkpoint["preprocess"]
+    else:
+        output.mkdir(parents=True, exist_ok=True)
+        print("Fitting preprocessing on the training period")
+        state = fit_preprocess(frame.filter(pl.col(PARTITION) == "train").lazy())
+        checkpoint = {
+            "settings": input_settings(config),
             "preprocess": state,
-        },
-        output / "model.pt",
+            "config": {
+                name: vars(value)
+                for name, value in vars(config).items()
+                if isinstance(value, Config)
+            },
+        }
+    model = FlowTransformer(
+        config, len(NUMERIC_COLUMNS), vocabulary_sizes(state), causal=config.model.kind != "base"
+    ).to(device)
+    print(
+        f"Model: {config.model.layers} layers, width {config.model.d_model},",
+        f"{sum(parameter.numel() for parameter in model.parameters()):,} parameters",
     )
-    _save(output / "history.json", history)
-    print(f"Saved {config.model.kind} to {output / 'model.pt'}")
 
-
-def evaluate_model(config: Config) -> None:
-    """Evaluate saved weights on development tests and the untouched holdout."""
-    _seed(config.run.seed)
-    device = _device(config.run.device)
-    output = Path(config.run.output)
-    bundle = torch.load(output / "model.pt", map_location=device, weights_only=True)
-    state: State = bundle["preprocess"]
-    if bundle["contract"] != _contract(config):
-        raise ValueError("checkpoint contract does not match the configuration")
-    model = _model(config, state).to(device)
-    _ = model.load_state_dict(bundle["model"])
-
-    development, _ = _development(config)
-    results: dict[str, object] = {}
-    for source, frame in development.items():
-        source_partitions = _partitions({source: frame}, state, config, ("test",))
-        _, labels, probability = evaluate(
+    if evaluate_only:
+        _ = model.load_state_dict(checkpoint["model"])
+    else:
+        pretraining = config.model.kind in {
+            "reconstruct",
+            "teacher",
+            "hybrid",
+            "future-hybrid",
+            "future-jepa",
+        }
+        partitions = make_datasets(
+            frame, state, config, ("train", "validation"), supervised=not pretraining
+        )
+        if pretraining:
+            print(f"Pretraining on {len(partitions['train']):,} targets")
+            objective = (
+                M2Pretrainer(model, config.model.kind)
+                if config.model.kind in {"hybrid", "future-hybrid", "future-jepa"}
+                else Pretrainer(model, config.model.kind)
+            ).to(device)
+            loaders: dict[str, DataLoader[dict[str, torch.Tensor]]] = {}
+            eligibility: dict[str, object] = {}
+            future: FutureDataset | None = None
+            for name, dataset in partitions.items():
+                future = (
+                    FutureDataset(dataset, frame.filter(pl.col(PARTITION) == name))
+                    if config.model.kind.startswith("future-")
+                    else None
+                )
+                loaders[name] = make_loader(
+                    future if future is not None else dataset,
+                    config,
+                    shuffle=name == "train",
+                    device=device,
+                    collate_fn=future.collate if future is not None else collate,
+                )
+                if future is not None:
+                    eligibility[name] = {
+                        "anchors": len(dataset),
+                        "eligible": len(future),
+                        "horizons": {
+                            str(h): int((future.targets[:, i] >= 0).sum())
+                            for i, h in enumerate(HORIZONS)
+                        },
+                    }
+            if eligibility:
+                save_json(output / "future_targets.json", eligibility)
+                print(f"Future targets: {eligibility}")
+            seed_all(config.run.seed)
+            history = pretrain(
+                objective,
+                loaders["train"],
+                loaders["validation"],
+                config,
+                device,
+            )
+            torch.save(
+                {**checkpoint, "pretrainer": objective.state_dict(), "model": model.state_dict()},
+                output / "pretrained.pt",
+            )
+            save_json(output / "pretrain_history.json", history)
+            del objective, loaders, future
+            partitions = {
+                name: dataset.with_labels(frame.filter(pl.col(PARTITION) == name))
+                for name, dataset in partitions.items()
+            }
+            seed_all(config.run.seed)
+        print(
+            f"Classification: {len(partitions['train']):,} training and",
+            f"{len(partitions['validation']):,} validation targets",
+        )
+        history, weights = fit(
             model,
-            _loader(source_partitions["test"], config, shuffle=False, device=device),
+            make_loader(partitions["train"], config, shuffle=True, device=device),
+            make_loader(partitions["validation"], config, shuffle=False, device=device),
+            config,
             device,
         )
-        results[source] = {
-            config.model.kind: binary(labels, probability),
-            "always_benign": binary(labels, always_benign(len(labels), labels.device)),
-        }
+        _ = model.load_state_dict(weights)
+        torch.save({**checkpoint, "model": weights}, output / "model.pt")
+        save_json(output / "history.json", history)
+        save_json(output / "config.json", checkpoint["config"])
+        del partitions, weights
 
-    holdout_frame = holdout(load(config)[config.data.holdout])
-    holdout_partitions = _partitions({config.data.holdout: holdout_frame}, state, config, ("test",))
+    dataset = make_datasets(frame, state, config, ("test",))["test"]
+    del frame, checkpoint
+    print(f"Evaluating {len(dataset):,} test targets")
     _, labels, probability = evaluate(
-        model,
-        _loader(holdout_partitions["test"], config, shuffle=False, device=device),
-        device,
+        model, make_loader(dataset, config, shuffle=False, device=device), device
     )
-    results[config.data.holdout] = {
-        config.model.kind: binary(labels, probability),
-        "always_benign": binary(labels, always_benign(len(labels), labels.device)),
+    dataset.targets.with_columns(
+        pl.Series("label", labels.numpy()),
+        pl.Series("probability", probability.numpy()),
+    ).write_parquet(output / "predictions.parquet")
+    results = {
+        config.data.dataset: {
+            config.model.kind: binary(labels, probability),
+            "always_benign": binary(labels, torch.zeros_like(labels)),
+        }
     }
-    _save(output / "metrics.json", results)
+    save_json(output / "metrics.json", results)
     print(json.dumps(results, indent=2, allow_nan=False))
+    print(f"Saved results to {output}")
 
 
 def main() -> None:
-    """Parse the model command line and run its selected action."""
+    """Run one model from config through training and evaluation"""
     parser = argparse.ArgumentParser(description=__doc__)
-    _ = parser.add_argument("action", choices=("train", "evaluate"))
-    _ = parser.add_argument("--config", required=True)
+    _ = parser.add_argument("model", choices=("M0", "M1", "M2"))
+    _ = parser.add_argument("variant")
+    _ = parser.add_argument("--seed", type=int)
+    _ = parser.add_argument("--evaluate-only", action="store_true")
     arguments = parser.parse_args()
-    config = Config.load(arguments.config)
-    if arguments.action == "train":
-        train(config)
-    else:
-        evaluate_model(config)
+    variants = {
+        "M0": ("base", "small", "matched"),
+        "M1": ("reconstruct", "teacher"),
+        "M2": ("hybrid", "future-hybrid", "future-jepa"),
+    }
+    if arguments.variant not in variants[arguments.model]:
+        parser.error(f"{arguments.model} variants: {', '.join(variants[arguments.model])}")
+    path = Path("tools/config") / f"{arguments.model.lower()}.{arguments.variant.lower()}.toml"
+    config = Config.load(path)
+    expected_output = f"results/{arguments.model}-{arguments.variant}"
+    if config.model.kind != arguments.variant or config.run.output != expected_output:
+        parser.error(f"{path} must use variant {arguments.variant} and output {expected_output}")
+    if arguments.seed is not None:
+        config.run.seed = arguments.seed
+        config.run.output = str(Path(config.run.output) / f"seed-{arguments.seed}")
+    run(config, evaluate_only=arguments.evaluate_only)
 
 
 if __name__ == "__main__":

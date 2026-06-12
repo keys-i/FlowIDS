@@ -3,16 +3,11 @@ description = "25M causal FlowTransformer matched to M0 Base"
 [run]
 seed = 42
 device = "auto"
-output = "outs/m0-matched"
+output = "results/M0-matched"
 
 [data]
 root = "data/publish/data"
-development = [
-  "NF-UNSW-NB15-v3",
-  "NF-BoT-IoT-v3",
-  "NF-ToN-IoT-v3",
-]
-holdout = "NF-CICIDS2018-v3"
+dataset = "NF-UNSW-NB15-v3"
 horizon_minutes = 10
 max_events = 256
 batch_size = 256

@@ -3,16 +3,11 @@ description = "8-flow causal FlowTransformer: 64-wide, 2 layers, 2 heads, FFN 12
 [run]
 seed = 42
 device = "auto"
-output = "outs/m0-small"
+output = "results/M0-small"
 
 [data]
 root = "data/publish/data"
-development = [
-  "NF-UNSW-NB15-v3",
-  "NF-BoT-IoT-v3",
-  "NF-ToN-IoT-v3",
-]
-holdout = "NF-CICIDS2018-v3"
+dataset = "NF-UNSW-NB15-v3"
 horizon_minutes = 10
 max_events = 8
 batch_size = 256
