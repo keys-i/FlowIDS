@@ -34,6 +34,10 @@ def read_runs(root: Path) -> list[Run]:
     """Read completed runs and retain settings needed to compare seeds"""
     runs: list[Run] = []
     for path in sorted(root.rglob("metrics.json")):
+        status = path.with_name("status.json")
+        if status.exists() and not json.loads(status.read_text())["complete"]:
+            print(f"{path.parent}: incomplete run; skipping")
+            continue
         results = json.loads(path.read_text())
         if len(results) != 1:
             raise ValueError(f"{path} must contain exactly one dataset")
@@ -55,6 +59,8 @@ def read_runs(root: Path) -> list[Run]:
                     else "M2"
                 )
                 name = f"{family}-{variant}"
+                if config is not None and "hours" in config["run"]:
+                    name += f" ({config['run']['hours']:g}h)"
                 runs.append(
                     Run(
                         path.parent,
@@ -66,7 +72,7 @@ def read_runs(root: Path) -> list[Run]:
                     )
                 )
     if not runs:
-        raise ValueError(f"No metrics.json files found beneath {root}; evaluate a model first")
+        raise ValueError(f"No completed runs beneath {root}; evaluate a model first")
     return runs
 
 

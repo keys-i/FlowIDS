@@ -111,14 +111,15 @@ a port-free result is mandatory.
 
 ## M0 decisions
 
-1. Final M0 uses NF-UNSW-NB15-v3 only. The other NF3 files remain exploration
+1. Current M0–M2 runs use NF-CSE-CIC-IDS2018-v3 only. The other NF3 files remain exploration
    evidence, not training or holdout data for this baseline.
-2. Build chronological and group-separated splits under `src/m0`; never use a
+2. Build chronological and group-separated splits in `src/data/load.py`; never use a
    random row split.
 3. Fit imputation, scaling, vocabularies, port buckets, and all other learned
    preprocessing on training data only.
 4. Use the implemented M0 fields and context. The later ladder's input and
    evaluation rules remain separate plans.
 
-Exploration is complete. M0 is implemented on NF-UNSW-NB15-v3; these results
-do not establish transfer, operational generalisation, or a foundation model.
+Exploration is complete. M0–M2 are configured for NF-CSE-CIC-IDS2018-v3;
+full-data model runs remain unverified. The exploration results do not establish
+transfer, operational generalisation, or a foundation model.

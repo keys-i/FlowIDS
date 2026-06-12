@@ -6,8 +6,8 @@ device = "auto"
 output = "results/M0-matched"
 
 [data]
-root = "data/publish/data"
-dataset = "NF-UNSW-NB15-v3"
+root = "data"
+dataset = "NF-CSE-CIC-IDS2018-v3"
 horizon_minutes = 10
 max_events = 256
 batch_size = 256
