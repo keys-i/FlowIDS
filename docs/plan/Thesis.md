@@ -1,230 +1,120 @@
-# Thesis execution roadmap
+# Evaluation plan
 
-This file owns claims, hypotheses, corpus roles, evaluation, decision rules, and
-the year-one programme. [Model](Model.md) owns model/rung mechanics;
-[Architecture](Architecture.md) owns data and runtime contracts; [Refs](Refs.md)
-owns evidence. Nothing here asserts that the proposed system already works.
+This plan describes later experiments. Current M0–M2 runs use only
+NF-CSE-CIC-IDS2018-v3 with a chronological 70/15/15 split; see the
+[repository README](../../README.md#run-a-model). The ladder compares
+[models](Model.md) with the same label budget and false-alert limits.
 
-## Starting point and claim boundary
+Here, *scratch* has no pretraining, *frozen* keeps the encoder fixed for the
+target task, and *fine-tuning* updates it with the allowed labels.
 
-`explore` is a data-exploration scaffold, not a model to retain.
-The local historical prototype is ineligible as a deployment or
-foundation-model design and survives only as the `historical-recreation`
-defined in [Model](Model.md#scope-and-decision-boundary).
-[FlowTransformer](Refs.md#flowtransformer2024) is a supervised flow-sequence
-baseline and [Anomal-E](Refs.md#anomale) is graph SSL; neither is an existing
-Transformer foundation model for unlabeled NetFlow.
-
-Masked reconstruction, EMA teachers, hierarchy, and relation bias are not
-individually novel. [MMAE](Refs.md#mmae2026) (March 2026) substantially
-anticipates masked teacher--student traffic learning, while
-[CMES](Refs.md#cmescrossflow2026) (July 2026) directly anticipates learned
-cross-flow relation bias. The narrow contribution under test is:
-
-> Causal endpoint-ego histories, identity-free endpoint relations and hybrid
-> semantic masked prediction for transferable NetFlow representations under
-> label scarcity and network shift.
-
-M2-F future-latent prediction is a conditional JEPA-family comparator, closest
-in causal next-latent geometry to [LeNEPA](Refs.md#lenepa), not the thesis
-contribution. [I-JEPA](Refs.md#ijepa) and [data2vec](Refs.md#data2vec) already
-establish the broad predictive-representation family. M2-F asks only whether
-that objective adds external low-label value after M2-H while ruling out
-corpus, day, target-eligibility, and endpoint-activity shortcuts.
-
-A stronger packet-sequence-teacher → NetFlow-only-student contribution is
-conditional on usable paired captures, alignment/privacy evidence, and a
-refreshed novelty search. “Better than leading research” means winning under
-one data, split, label, parameter, and compute contract. Published headline
-scores from incompatible random-row or author-specific splits do not count. A
-held-out family is never “zero-day.”
-
-## Falsifiable hypotheses and claim tiers
-
-| ID | Hypothesis | Falsifier |
-|---|---|---|
-| H1 — low-label transfer | Source-only, identifier-free NetFlow SSL improves binary IDS over the strongest matched scratch/tree comparator at `k=10` labelled groups per class on at least two unseen networks. | The paired lower confidence bound is not positive, or the result vanishes under chronological, entity-disjoint, or port-free evaluation. |
-| H2 — operational | H1 survives one frozen threshold at no more than 10 false alerts per million flows. | TPR is inferior at that alert budget or the threshold needs target-test information. |
-| H3 — versatility | The same pretrained checkpoint, without task-specific pretraining or backbone redesign, transfers to binary IDS, attack-family, and application/service or device classification. | It helps only one task family or requires a different pretraining checkpoint/backbone per task. |
-| H4 — conditional privileged distillation | A packet/payload teacher improves a payload-free NetFlow student on unseen networks beyond same-modality controls. | Pairing, privacy, or external student-gain checks fail. |
-| H5 — conditional future latent | M2-F adds external low-label transfer value beyond promoted and eligible-anchor M2-H, rather than learning corpus, day, eligibility, or endpoint-activity regularities. | Its controls match it, its incremental transfer confidence interval includes zero, or it fails on unseen networks. |
-
-| Claim | Minimum evidence |
+| Claim | Evidence needed |
 |---|---|
-| Pretrained encoder | SSL beats the parameter-matched scratch model in-domain. |
-| Transferable encoder | The result improves a later or independent network. |
-| General-purpose representation | One checkpoint improves at least three tasks spanning at least two task families on at least two unseen domains, including frozen-probe evidence where applicable. |
-| Novel system contribution | M2-H beats both constituents and MMAE-NF; M3-Ego has a positive hybrid×ego interaction; M4-Rel adds independent anonymous-relation value; H1/H2 pass on two unseen domains. No constituent is claimed as novel alone. |
-| Foundation-model claim | The general-purpose criterion passes; low-label adaptation and scaling remain positive; no target-test flow, metadata, prevalence, or label affected selection. |
+| Pretrained encoder | Beats parameter-matched scratch in-domain |
+| Transferable encoder | Improves a later or independent network |
+| Combined method | Each addition passes its [matched comparison](Model.md#experiment-sequence), including greater benefit from pretraining with endpoint history; the thresholds below pass on two unseen networks |
+| General-purpose representation | One checkpoint helps binary IDS, attack-family, and application/service or device tasks across two task families and two unseen domains |
 
-The four supplied NF3 datasets are accepted benchmark inputs. NF3-only results
-are a benchmark study, not operational proof or foundation-model evidence. If M0
-reaches classical parity, apply only the
-[restricted discriminator](Model.md#classical-parity-discriminator); if that
-or external low-label SSL fails, stop. A negative result is preferable to a
-false foundation-model claim.
+Foundation-model claims also require few-label and scaling evidence, with no
+test data used to choose the model. A held-out attack family alone does not
+establish detection of new zero-days.
 
-## Corpus roles
+## Datasets and their use
 
-| Corpus | Scientific role | Reporting boundary |
+| Dataset | Use | Limit |
 |---|---|---|
-| NF-UNSW-NB15-v3, NF-BoT-IoT-v3, NF-ToN-IoT-v3 | Controlled IDS and attack-family development. | Different conversions of the same capture count as one source; matching schemas do not make them operational domains. |
-| NF-CSE-CIC-IDS2018-v3 | Held-out public benchmark after Exploration. | Its labels and distributions have been inspected, so it is not sealed. It receives no pretraining, model selection, threshold tuning, or adaptation. A genuinely sealed claim requires a new uninspected target. |
-| Private multi-site | Main unlabeled source and approved benign/calibration material. | Does not establish benignness beyond the approved use. |
-| Private or public paired captures | X1-Distill packet-teacher source. | Keep one original capture and all derivatives in one partition; report pairing and privacy limits. |
-| CTU-13, UGR’16, LITNET-2020, MAWI, CESNET-TLS-Year22, CIC-IoT-2022 | Optional external stress tests or task probes. | Use only when their fields and time/order support the stated split; otherwise report them as unavailable rather than forcing a claim. |
+| NF-CSE-CIC-IDS2018-v3 | Current M0–M2 training, validation, and test benchmark | Pretrain and fit on the training period only; this dataset cannot also serve as an unseen transfer target |
+| NF-UNSW-NB15-v3, NF-BoT-IoT-v3, NF-ToN-IoT-v3 | Prior exploration only | Excluded from current model runs |
+| Private multi-site traffic | Unlabelled source and approved benign/calibration data | Access needs confirmation; permission to use data does not establish that it is benign |
+| Paired private or public captures | Packet-teacher comparison | A capture and its derivatives stay in one partition; report pairing and privacy limits |
+| CTU-13, UGR'16, LITNET-2020, MAWI, CESNET-TLS-Year22, CIC-IoT-2022 | Optional external tests or probes | Report missing fields or unsuitable time order |
 
-## Exploration and M0
+## Evaluation and leakage checks
 
-Exploration is complete. It answers only: schema and labels, time order,
-missingness, duplicates, field selection, and evaluation decisions. The
-[findings](../exp/explore.md) contain no model scores.
+The main result is *inductive*: pretraining uses source partitions only. A
+separate transductive experiment may use unlabelled target training-period
+traffic, but cannot replace the main result.
 
-Before any training, M0 work under `src` constructs reproducible splits, fits
-preprocessing on training data only, and checks causal state/context at every
-split boundary. See [Exploration](Architecture.md#exploration) and
-[M0 implementation](Architecture.md#m0-implementation).
+Split target traffic into adaptation, calibration, and final test periods.
+Keep exact duplicates together. Apply the relevant chronological purge,
+family/campaign, and capture separation. [Architecture](Architecture.md#context-and-endpoint-relationships)
+defines history resets and endpoint-disjoint splitting. Test data must not choose transforms,
+pretraining, calibration, thresholds, or models. Open final-test labels once,
+after those choices are fixed.
 
-## Evaluation and leakage contract
+<details>
+<summary>Label budgets, repeated runs, and reported metrics</summary>
 
-The primary result is inductive: pretraining uses source partitions only, with
-no unlabeled target traffic. A separately reported transductive track may use
-only unlabeled target-training-period traffic and never substitutes for the
-primary claim.
+Few-label support is grouped rather than sampled by row:
+`k={1,5,10,50,100}` independent groups per class. A group is a documented
+attack episode or campaign, or a maximal same-family/entity cluster with gaps
+of at most five minutes. Benign support is host-hours. Report groups, flows,
+and analyst minutes. Validation and calibration labels count against `k`; at
+`k={1,5,10}`, source data fixes hyperparameters, calibrator, and threshold.
+An unavailable group is unsupported.
 
-Within each target, allocate early adaptation, later calibration, and final
-chronological test. Reset state at every boundary; test state may include only
-earlier events from that same test partition. Exact duplicate records stay in
-one partition; near-duplicate counts are reported during Exploration but do not
-define a split. The additional isolation factor is track-specific: time with
-boundary purge, endpoint principals, complete family/campaign units, or
-dataset/capture source. Reject any target-test influence on selection,
-transforms, pretraining, calibration, or thresholds.
+Fix five pretraining seeds and five support draws before screening. Screening
+uses three pretraining seeds; the final result uses five. Both use every
+support draw and three downstream seeds. Use paired 10,000-resample block
+bootstraps over days, weeks, campaigns, hosts, or domains, never individual
+flows. Training seeds measure run variation, not independent data. Weight
+each usable domain equally in cross-domain summaries.
 
-Few-label support is grouped, not row sampled:
-`k={1,5,10,50,100}` independent groups per supported class. A group is a
-documented attack episode/campaign, or a maximal contiguous
-same-family/entity cluster whose consecutive gaps do not exceed five minutes;
-benign supports are host-hours. Report support groups, covered flows, and
-measured analyst minutes when adjudication exists.
-Any target validation or calibration labels count against `k`; at
-`k={1,5,10}`, hyperparameters, calibrator, and alert threshold stay
-source-selected. A class without `k` independent groups is unsupported rather
-than row-resampled. Unsupported classes remain unsupported. Freeze five
-pretraining seeds and five support draws before screening; use the first three
-pretraining seeds for screening and all five for final confirmation, with all
-five support draws and
-three downstream optimization seeds in either phase. Use paired
-10,000-resample block bootstraps over days, weeks, campaigns, hosts, or
-domains—not flow rows. Average repeated optimization/seed results within each
-independent block; seeds measure variability, not sample size. Cross-domain
-aggregates give each eligible domain equal weight and never pool its flow rows
-with another domain.
+FPR is the fraction of benign flows incorrectly flagged.
 
-| Evaluation family | Required outcomes |
-|---|---|
-| Binary and held-out-family IDS | AUPRC, AUROC, TPR at FPR `10^-4`, `10^-3`, and `10^-2`, and TPR at 1, 10, and 100 false alerts per million flows; report prevalence, precision, alerts/hour, campaign recall, and detection delay. H2 uses 10 alerts per million. |
-| Attack-family IDS | Macro one-vs-rest AUPRC, macro/weighted F1, worst-family recall, supported-class coverage, and binary operational measures. |
-| Zero-label anomaly | Benign-only score, AUPRC where labels exist, and recall at frozen alert budgets; never a supervised “zero-shot” claim. |
-| Application/service and device | Frozen linear probe and full fine-tune macro F1, under the stated corpus exclusions/groups. |
-| Efficiency | Parameters, training/adaptation FLOPs, flows, exposures, labelled groups/minutes, accelerator-hours, checkpoint size, memory, throughput, and p50/p95/p99 completion latency. |
+Report AUPRC, AUROC, and TPR at FPR `10^-4`, `10^-3`, and `10^-2`. Also report TPR at 1, 10, and
+100 alerts per million flows, prevalence, precision, alerts per hour, recall,
+and delay. For attack families, add macro one-vs-rest AUPRC, macro/weighted
+F1, worst-family recall, and coverage. For application/service and device
+tasks, report frozen linear probes and full fine-tuning macro F1 under the
+stated exclusions and groups. Zero-label anomaly tests use benign-only scores,
+AUPRC where labels exist, and recall at fixed budgets; they are not supervised
+zero-shot tests. Report
+parameters, FLOPs, flows, exposures, labels/minutes, accelerator-hours,
+checkpoint size, memory, throughput, and p50/p95/p99 completion latency.
 
-For every fixed-FPR or alert-budget point, report the benign denominator and
-achievable empirical resolution. Mark an operating point unsupported when the
-test cannot resolve it; do not interpolate a claim below one observed false
-alert.
+Every fixed-alert or fixed-FPR result names its benign denominator and
+resolution. Do not interpolate below one observed false alert. NLL, Brier,
+classwise expected calibration error (ECE), and reliability plots use calibration data only; source-selected
+calibration stays fixed for zero-label targets. Freeze hardware, batch policy,
+and the measurement harness before the final run.
 
-Report NLL, Brier score, classwise ECE, and reliability plots. Thresholds and
-temperature scaling use calibration only. Keep a source-selected
-threshold/calibrator fixed for zero-label target results. The five seed suites
-and 10,000-resample bootstrap are mandatory; nonparametric dataset tests are
-supplementary only when enough independent domains exist.
+</details>
 
-Promotion also requires all precommitted non-inferiority limits: TPR at 10
-false alerts per million may fall by at most one absolute point; classwise ECE
-may worsen by at most 0.02; no supported application/device frozen probe may
-lose more than two macro-F1 points; completion inference must meet the p95 CPU
-and endpoint-state limits in
-[Architecture](Architecture.md#encoder-and-inference-envelope). Freeze the
-target CPU, accelerator, batch policy, and measurement harness before final
-confirmation. An
-unavailable second task family does not receive a pass; it removes the
-general-purpose and foundation-model claims.
+## What counts as an improvement
 
-## Research questions and decision rules
+AUPRC summarises the trade-off between detecting attacks and alert precision.
+TPR is the fraction of attacks detected. Macro scores give each supported
+attack family equal weight. One AUPRC point is `0.01`.
 
-1. Does SSL beat the identical scratch model and best classical model under
-   fixed field, split, label, and compute budgets?
-2. Does raw-plus-latent beat both constituents and MMAE-NF at matched exposure
-   and FLOPs?
-3. Does causal ego context yield positive main and SSL×ego interaction effects
-   beyond flat, random, time/feature-matched, and CMES grouping?
-4. Do anonymous directed relations add information under endpoint renaming and
-   relation-destruction controls?
-5. Does M2-F JEPA-family future-latent prediction add external low-label value
-   beyond promoted and eligible-anchor M2-H, or only learn corpus, day,
-   eligibility, and endpoint-activity regularities?
-6. Do gains survive future-time, endpoint-disjoint, held-out-family, and
-   cross-network tests at H2’s alert budget?
-7. Does data-first, then parameter, scaling justify measured cost?
-8. Conditional on paired captures, does X1-Distill improve the deployed NetFlow-only
-   student beyond same-modality and shuffled-alignment controls?
+The label-efficiency area combines scores across label budgets: use the
+trapezoidal area under score versus `log10(k)`, normalized by that log span.
 
-Use the component checks, collapse screens, rungs, comparators, and scale
-policy in [Model](Model.md#evidence-ladder) and
-[Model](Model.md#promotion-collapse-and-scaling). Failed additions are deleted
-from the promoted stack and retained as negative ablations. Open final-test
-labels exactly once after freezing all choices.
+Before M0 is used to justify later pretraining work, the classical check must
+pass: M0 Matched beats the best classical control by 1.0 macro one-vs-rest
+AUPRC point at `k=10` labelled support groups per class, the paired
+hierarchical-bootstrap 95% lower bound is above zero, and TPR at 10 false
+alerts per million loses at most one absolute point.
 
-## Excluded or conditional alternatives
+Any later stage must pass all three checks:
 
-| Candidate | Decision | Reason |
-|---|---|---|
-| `d=256` compact Transformer | S0 mechanism screen only. | The canonical comparison is the Model 25M backbone; compact screening cannot establish the final claim. |
-| M2-F JEPA-family future latent | Conditional branch after M2-H. | It is an established predictive-latent family, not a new thesis contribution; retain it only for incremental external low-label value beyond its controls. |
-| Next-60-second raw aggregate forecast | M2-F control only. | It tests whether a future-latent result is no better than an aggregate activity forecast. |
-| Pooled future-window latent | Excluded from the current plan. | Pooling and event count add another confound before point-horizon evidence exists. |
-| Context length `W={3,8,20}` | One fixed, source-validation ablation; `W` includes the target. | It tests length, not a new mechanism; do not combine it with M2-F or replace the canonical context without external value. |
-| Time-gap sessionisation | Train-only diagnostic, then one isolated ablation only if stable. | A source-derived gap rule may reveal burst structure but must not become a dataset/session identifier or a new model. |
-| Conversation and source-host context | Matched controls for M3-Ego. | Test one builder at a time under the same history budget. If either matches endpoint-ego, reject the endpoint-ego contribution; do not fuse views or add a second encoder. |
-| Packet-prefix/live scoring | Outside the core completion-flow thesis. | Use only when active flow-snapshot records make causal availability checkable; otherwise do not claim live detection. |
-| Packet/payload teacher | X1-Distill only. | X1-Distill is privileged training with a NetFlow-only student and independent data, privacy, alignment, and novelty checks. |
-| GraphSAGE relational extension | Challenger only. | No graph module enters the promoted architecture unless it beats the fixed causal Transformer under the same contract. |
-| 1.5M→6M→40M scale plan | Not canonical. | Use Model’s S0→S4 data-first ladder; compact alternatives can screen mechanisms but cannot change scaling claims. |
+- Gain 1.0 absolute macro-AUPRC point at `k=10` and in the fixed
+  label-efficiency area, beating the best model with the same inputs.
+- Improve on two independent targets, with the paired hierarchical-bootstrap
+  95% lower bound above zero.
+- Lose at most one macro-AUPRC point on any target and two recall points on
+  any critical attack family.
 
-## Work packages and one-year schedule
+To continue, TPR at 10 alerts per million may lose at most
+one absolute point, classwise ECE may worsen by at most `0.02`, no supported
+frozen probe may lose more than two macro-F1 points, and p95 CPU plus endpoint
+state must meet [Architecture's inference target](Architecture.md#encoder-and-inference).
 
-| Time | Work packages | Exit decision |
-|---|---|---|
-| Months 1–2 | Exploration: schema/labels, time order, missingness, duplicates, field selection, and evaluation decisions. | Record benchmark limits; do not overstate the result. |
-| Month 3 | M0 under `src`: splits, train-only preprocessing, and causal-state/context checks; historical/classical controls. | Apply the [classical-parity discriminator](Model.md#classical-parity-discriminator); stop Transformer/SSL progression if it fails. |
-| Months 4–5 | Constituent screen and M1-R/M1-L confirmation. | Stop SSL if neither constituent has external low-label signal. |
-| Months 6–7 | Hybrid confirmation, then separate M2-F future-latent and M3-Ego branches. M3-Ego proceeds from M2-H whether M2-F survives; keep length, time-gap, conversation, and source-host checks isolated. | Retain M2-F only for incremental external low-label value; reject ego if a matched control suffices. If both branches pass, their combination must beat each branch before promotion. |
-| Month 8 | Relation study and year-one acceptance across binary, family, and available H3 probes. | Report a positive or negative H1/H2 and hybrid/ego result. |
-| Months 9–10 | Conditional hierarchy and X1-Distill preparation/experiment. | M5-Hier requires observed truncation; X1-Distill requires paired data and refreshed novelty evidence. |
-| Month 11 | Data-first scaling of the promoted stack. | Stop under the Model double-exposure failure rule; graph/prefix work cannot rescue failure. |
-| Month 12 | Sealed replication and reporting. | Five-seed final confirmation, saved configurations and results, uncertainty report, narrowest claim tier. |
+## If a test fails
 
-Year-one acceptance requires H1 on two independent held-out domains, H2 at the
-frozen 10-alert-per-million threshold, a result for both SSL constituents and
-their combination, and every available task probe reported with its limits.
-H3/X1-Distill are not claimed merely because a benchmark exists.
-
-## Negative outcomes and final statement
-
-| Outcome | Required conclusion |
-|---|---|
-| Classical parity and restricted discriminator failure | Sequence modelling and SSL were not justified under the tested portable NetFlow contract. |
-| Both SSL constituents fail | SSL did not overcome the observed domain or label-scarcity gap. |
-| M2-F future-latent prediction fails | Delete it and retain M2-H; make no JEPA claim. |
-| Hybrid, ego, or relation fails | Remove the mechanism; do not keep it as decoration. |
-| Operational or external transfer fails | At most an in-domain pretrained encoder; no foundation or operational claim. |
-| H3 probe unavailable | Remove general-purpose and foundation-model language. |
-| X1-Distill fails | Omit packet distillation without delaying the NetFlow result. |
-| Scaling fails | Retain the smaller promoted model; do not compensate with repeated exposure or a new architecture. |
-| NF3-only study | Describe a leakage-aware benchmark study only. |
-
-The final thesis claim is the highest supported tier above—never stronger—and
-links component evidence to [Model](Model.md), implementation invariants to
-[Architecture](Architecture.md), and novelty/reproduction evidence to
-[Refs](Refs.md#prior-art-and-reproduction-boundaries).
+Remove the failed addition and make the narrowest claim supported by the
+result. Classical parity plus failure of the [restricted S0 check](Model.md#classical-model-check)
+means sequence modelling and SSL did not help this flow setup. If transfer fails, report an in-domain pretrained encoder
+only. If a task family is unavailable, omit general-purpose language. A failed
+packet teacher does not delay the NetFlow result. An NF3-only study is a
+leakage-aware benchmark study.
