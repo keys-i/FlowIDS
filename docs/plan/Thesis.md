@@ -25,6 +25,13 @@ cross-flow relation bias. The narrow contribution under test is:
 > semantic masked prediction for transferable NetFlow representations under
 > label scarcity and network shift.
 
+M2-F future-latent prediction is a conditional JEPA-family comparator, closest
+in causal next-latent geometry to [LeNEPA](Refs.md#lenepa), not the thesis
+contribution. [I-JEPA](Refs.md#ijepa) and [data2vec](Refs.md#data2vec) already
+establish the broad predictive-representation family. M2-F asks only whether
+that objective adds external low-label value after M2-H while ruling out
+corpus, day, target-eligibility, and endpoint-activity shortcuts.
+
 A stronger packet-sequence-teacher → NetFlow-only-student contribution is
 conditional on usable paired captures, alignment/privacy evidence, and a
 refreshed novelty search. “Better than leading research” means winning under
@@ -40,6 +47,7 @@ held-out family is never “zero-day.”
 | H2 — operational | H1 survives one frozen threshold at no more than 10 false alerts per million flows. | TPR is inferior at that alert budget or the threshold needs target-test information. |
 | H3 — versatility | The same pretrained checkpoint, without task-specific pretraining or backbone redesign, transfers to binary IDS, attack-family, and application/service or device classification. | It helps only one task family or requires a different pretraining checkpoint/backbone per task. |
 | H4 — conditional privileged distillation | A packet/payload teacher improves a payload-free NetFlow student on unseen networks beyond same-modality controls. | Pairing, privacy, or external student-gain checks fail. |
+| H5 — conditional future latent | M2-F adds external low-label transfer value beyond promoted and eligible-anchor M2-H, rather than learning corpus, day, eligibility, or endpoint-activity regularities. | Its controls match it, its incremental transfer confidence interval includes zero, or it fails on unseen networks. |
 
 | Claim | Minimum evidence |
 |---|---|
@@ -153,10 +161,13 @@ general-purpose and foundation-model claims.
    beyond flat, random, time/feature-matched, and CMES grouping?
 4. Do anonymous directed relations add information under endpoint renaming and
    relation-destruction controls?
-5. Do gains survive future-time, endpoint-disjoint, held-out-family, and
+5. Does M2-F JEPA-family future-latent prediction add external low-label value
+   beyond promoted and eligible-anchor M2-H, or only learn corpus, day,
+   eligibility, and endpoint-activity regularities?
+6. Do gains survive future-time, endpoint-disjoint, held-out-family, and
    cross-network tests at H2’s alert budget?
-6. Does data-first, then parameter, scaling justify measured cost?
-7. Conditional on paired captures, does X1-Distill improve the deployed NetFlow-only
+7. Does data-first, then parameter, scaling justify measured cost?
+8. Conditional on paired captures, does X1-Distill improve the deployed NetFlow-only
    student beyond same-modality and shuffled-alignment controls?
 
 Use the component checks, collapse screens, rungs, comparators, and scale
@@ -170,7 +181,12 @@ labels exactly once after freezing all choices.
 | Candidate | Decision | Reason |
 |---|---|---|
 | `d=256` compact Transformer | S0 mechanism screen only. | The canonical comparison is the Model 25M backbone; compact screening cannot establish the final claim. |
-| Next-60-second forecasting | M2-F control/candidate only. | It is not inherited without external downstream value beyond shuffled-future and raw-next controls. |
+| M2-F JEPA-family future latent | Conditional branch after M2-H. | It is an established predictive-latent family, not a new thesis contribution; retain it only for incremental external low-label value beyond its controls. |
+| Next-60-second raw aggregate forecast | M2-F control only. | It tests whether a future-latent result is no better than an aggregate activity forecast. |
+| Pooled future-window latent | Excluded from the current plan. | Pooling and event count add another confound before point-horizon evidence exists. |
+| Context length `W={3,8,20}` | One fixed, source-validation ablation; `W` includes the target. | It tests length, not a new mechanism; do not combine it with M2-F or replace the canonical context without external value. |
+| Time-gap sessionisation | Train-only diagnostic, then one isolated ablation only if stable. | A source-derived gap rule may reveal burst structure but must not become a dataset/session identifier or a new model. |
+| Conversation and source-host context | Matched controls for M3-Ego. | Test one builder at a time under the same history budget. If either matches endpoint-ego, reject the endpoint-ego contribution; do not fuse views or add a second encoder. |
 | Packet-prefix/live scoring | Outside the core completion-flow thesis. | Use only when active flow-snapshot records make causal availability checkable; otherwise do not claim live detection. |
 | Packet/payload teacher | X1-Distill only. | X1-Distill is privileged training with a NetFlow-only student and independent data, privacy, alignment, and novelty checks. |
 | GraphSAGE relational extension | Challenger only. | No graph module enters the promoted architecture unless it beats the fixed causal Transformer under the same contract. |
@@ -183,7 +199,7 @@ labels exactly once after freezing all choices.
 | Months 1–2 | Exploration: schema/labels, time order, missingness, duplicates, field selection, and evaluation decisions. | Record benchmark limits; do not overstate the result. |
 | Month 3 | M0 under `src`: splits, train-only preprocessing, and causal-state/context checks; historical/classical controls. | Apply the [classical-parity discriminator](Model.md#classical-parity-discriminator); stop Transformer/SSL progression if it fails. |
 | Months 4–5 | Constituent screen and M1-R/M1-L confirmation. | Stop SSL if neither constituent has external low-label signal. |
-| Months 6–7 | Hybrid/future and ego factorial/confirmation. | Retain only hybrid evidence beyond constituents; reject ego if matched history suffices. |
+| Months 6–7 | Hybrid confirmation, then separate M2-F future-latent and M3-Ego branches. M3-Ego proceeds from M2-H whether M2-F survives; keep length, time-gap, conversation, and source-host checks isolated. | Retain M2-F only for incremental external low-label value; reject ego if a matched control suffices. If both branches pass, their combination must beat each branch before promotion. |
 | Month 8 | Relation study and year-one acceptance across binary, family, and available H3 probes. | Report a positive or negative H1/H2 and hybrid/ego result. |
 | Months 9–10 | Conditional hierarchy and X1-Distill preparation/experiment. | M5-Hier requires observed truncation; X1-Distill requires paired data and refreshed novelty evidence. |
 | Month 11 | Data-first scaling of the promoted stack. | Stop under the Model double-exposure failure rule; graph/prefix work cannot rescue failure. |
@@ -200,6 +216,7 @@ H3/X1-Distill are not claimed merely because a benchmark exists.
 |---|---|
 | Classical parity and restricted discriminator failure | Sequence modelling and SSL were not justified under the tested portable NetFlow contract. |
 | Both SSL constituents fail | SSL did not overcome the observed domain or label-scarcity gap. |
+| M2-F future-latent prediction fails | Delete it and retain M2-H; make no JEPA claim. |
 | Hybrid, ego, or relation fails | Remove the mechanism; do not keep it as decoration. |
 | Operational or external transfer fails | At most an in-domain pretrained encoder; no foundation or operational claim. |
 | H3 probe unavailable | Remove general-purpose and foundation-model language. |

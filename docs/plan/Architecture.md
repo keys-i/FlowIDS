@@ -79,6 +79,46 @@ fields, with event ID as final tie-breaker (`time-feature-matched`).
 `target-only` has no history. A comparison target without `h` non-incident
 candidates is unsupported.
 
+M2-F future targets are constructed separately from the student context.
+Here, `corpus` means the dataset/capture stream; `source endpoint` means the
+flow's source-address routing key. For an anchor, union and deduplicate only
+flows that are strictly later in the deterministic completion-time/event-ID
+order, belong to the same corpus, capture/exporter observation stream, and
+pretraining partition, and are incident to either anchor endpoint. The 1st,
+4th, and 16th candidates are the only targets. Each EMA-teacher target uses the
+same frozen flat 255-event/horizon builder as M0--M2-F, restricted to records
+available by that target's completion, and ends with the target flow. The
+student receives neither target flows nor future-derived metadata. Missing
+target positions are absent rather than padded; every point-horizon arm uses
+the same eligible anchors and horizon masks; and candidate state resets with
+the student state at every partition boundary. The separate 60-second aggregate
+diagnostic uses the same eligible anchor set but has no event-horizon mask.
+Objective, controls, and rejection details belong to [Model](Model.md).
+
+M3-Ego remains the proposed context mechanism. It is tested against three
+additional mutually exclusive, routing-only matched controls with the same
+history count and horizon: `flat` uses earlier collector flows; `conversation`
+uses earlier flows sharing the unordered endpoint pair while retaining each
+flow's direction fields; and `source-host` uses earlier flows emitted by the
+target source endpoint across destinations. `source-host` is valid only where
+source/initiator semantics are stable across the relevant corpora. Raw endpoint
+values select records but never enter model tensors. Conversation and
+source-host cannot promote M3 or support the endpoint-ego claim; if either
+matches or beats endpoint-ego, reject that claim. No builder is fused with
+another and none gets a second encoder.
+
+The optional length check uses total-token ceilings `W={3,8,20}`, including the
+final target, and left-pads every arm to 20 tokens. Hold target anchors and
+optimizer updates fixed, so visible history length is the only changed context
+factor. This is not a random window policy or the default context. Time-gap
+sessionisation is diagnostic only: inspect train-only completion-gap
+distributions separately for conversation, source-host, and endpoint-ego
+streams. `FLOW_GROUP` is never an input, label, or embedding. Choose at most
+one threshold from the predeclared `{1,10,60}`-second set on development
+validation partitions; use it only if the same threshold beats an equal-size
+unsessionised history on at least two development corpora, then freeze it
+before external evaluation.
+
 For endpoint-disjoint evaluation, assign held-out endpoint principals before
 context construction: flows with two held endpoints are test; flows joining a
 held and unheld endpoint are purged; the rest are training. Test context uses

@@ -79,17 +79,82 @@ L_latent makes the masked student predict the same-event representation from an
 unmasked, causal, stop-gradient EMA teacher. The target is the mean of the
 teacher's top four layer-normalized states; the student predictor has two
 layers. Teacher dropout is disabled and its momentum rises from 0.99 to 0.9999
-on a cosine schedule after optimizer updates.
+on a cosine schedule after optimizer updates. This is a data2vec-style
+same-event comparator, not a future-prediction method.
 
-L_future predicts EMA-teacher latents for the next causally subsequent event
-incident to either target endpoint at horizons 1, 4, and 16. Future events are
-targets only, never encoder input; missing horizons are ignored. It is compared
-with three controls before it may join the hybrid: shuffled-future targets
-shuffled within source/day/horizon, raw next-flow-value prediction, and a
-60-second endpoint aggregate forecast (log-binned flow, byte, packet,
-protocol-mix, and unique-remote-count summaries). A compact aggregate forecast
-is a control, not a promoted replacement mechanism; a shuffled-time gain is a
-shortcut failure.
+$L_{\mathrm{future}}$ is a conditional JEPA-family future-latent comparator in
+the existing M2-F rung, not a contribution or distinct architectural
+mechanism. Its causal next-latent geometry most directly collides with LeNEPA,
+although this candidate retains an EMA teacher. For anchor flow $i$, let $z_i$
+be the masked student's final anchor state and $H_i$ be the available horizons
+in $\{1,4,16\}$:
+
+$$
+L_{\mathrm{future}}(i)=\frac{1}{|H_i|}\sum_{h\in H_i}
+\left\|\operatorname{norm}\!\left(p(z_i+e_h)\right)-
+\operatorname{sg}\!\left(\operatorname{norm}(\bar z_{i,h})\right)\right\|_2^2.
+$$
+
+$\operatorname{norm}(u)=u/(\lVert u\rVert_2+10^{-6})$. $e_h$ is a learned
+horizon embedding with the encoder width, $p$ is one shared two-layer predictor,
+and $\bar z_{i,h}$ is the same top-four-layer EMA-teacher target used by
+$L_{\mathrm{latent}}$, now taken from the $h$-th later completed flow incident
+to either anchor endpoint. The teacher sees that target flow's own causal prefix
+ending at its completion, with dropout disabled. The student never sees a later
+flow or its metadata. Order candidates by completion time then deterministic
+event identifier within the same dataset corpus, capture/exporter observation
+stream, and pretraining partition; omit missing horizons and anchors for which
+$H_i$ is empty; average available horizons per anchor before averaging the
+batch so busy endpoints cannot dominate. Remove the predictor and EMA teacher
+at inference.
+
+M2-F may add $L_{\mathrm{future}}$ only after M2-H promotes:
+
+$$
+L_{\mathrm{M2-F}}=\lambda_{\mathrm{raw}}L_{\mathrm{raw}}+
+\lambda_{\mathrm{latent}}L_{\mathrm{latent}}+
+\lambda_{\mathrm{future}}L_{\mathrm{future}}.
+$$
+
+Before warm-up, freeze the eligible anchor/horizon sequence and all activity
+strata. On 200 batches from that sequence, set all three weights to inverse
+median loss and normalize them to sum to two, then freeze them. The
+eligible-anchor M2-H arm receives its own 200-batch two-loss warm-up under the
+existing sum-to-two rule; count warm-up and training events for every arm.
+Every point-horizon control replaces only the third target/head and uses the
+same weighting rule, anchor/horizon sequence, optimizer updates,
+trainable-parameter budget, and separate fixed-event-exposure and
+fixed-total-FLOP comparisons. Do not search weights.
+
+Compare M2-F against both promoted M2-H and M2-H retrained on the exact
+future-eligible anchors. Every future/control arm uses the same anchor and
+horizon-availability masks. Point-horizon controls are: a stratified shuffled
+latent target preserving dataset corpus, capture/exporter, partition, day,
+horizon, relative-time bucket, candidate-count bucket, and train-only
+activity/degree buckets computed from causal pre-anchor histories for both
+anchor endpoints; and future prediction of the permitted raw semantic fields
+at all three horizons using the same shared horizon conditioning and the
+group-balanced categorical, missingness, and numeric losses. Fit every stratum
+edge on the pretraining training partition and freeze it. For each run, use one
+precommitted shuffle seed and one fixed within-stratum derangement of target
+event IDs; never reshuffle by batch or epoch. A stratum without a valid
+derangement is unsupported, and its anchor/horizon pairs are removed from every
+point-horizon arm before the common sequence is frozen.
+
+Two additional diagnostics are: a frozen train-only teacher-target mean for
+each corpus and horizon; and a 60-second raw endpoint aggregate forecast
+(log-binned flow, byte, packet, protocol-mix, and unique-remote-count
+summaries). The aggregate is not a horizon-matched target: train it on the same
+eligible anchor set as a separate shortcut diagnostic, apply the same
+inverse-median third-loss weighting, and match its head parameters, updates,
+and total FLOPs within 5%. Match point-horizon predictor parameters and total
+FLOPs within 5% where target widths differ.
+
+The real target must beat stratified shuffle on predictive validation loss
+*and* external low-label transfer. Report eligibility and results by corpus,
+day, both-endpoint activity/degree, horizon, and target elapsed-time bucket. At
+each horizon, report teacher and predictor rank, variance, and nearest-neighbour
+cosine. Lower SSL loss alone is not evidence.
 
 The core objective is L_hybrid = lambda_raw L_raw + lambda_latent L_latent.
 Estimate each constituent's median on 200 train-only warm-up batches, set its
@@ -147,7 +212,7 @@ claimed overlap are governed by
 | M1-R | L_raw pretraining on flat causal contexts | Pass the common frozen promotion gate below against random-init M0. | Reject if gain needs identifiers or ports, vanishes chronologically, or is in-domain only. |
 | M1-L | L_latent instead of raw; parallel constituent | Pass collapse screen and beat M0 in the separate exposure-matched and FLOP-matched comparisons. | Reject if raw matches it or teacher/student collapse persists. |
 | M2-H | Add the other constituent: L_raw + L_latent | Beat M1-R and M1-L, not merely M0, under exposure and FLOP matching. | Reject if either constituent or MMAE-NF matches it. |
-| M2-F | Conditionally add L_future | Beat shuffled-future, raw-next, and 60-second aggregate-forecast controls on external transfer. | Reject for persistent gradient conflict, source/day identity, shortcut under time shuffle, or no external gain. |
+| M2-F | Conditionally add L_future | Beat promoted M2-H, eligible-anchor M2-H, and every named future control on external low-label transfer under fixed exposure and fixed FLOPs, then pass the common promotion and non-inferiority gates. | Reject if real targets do not beat stratified shuffle on predictive validation and external transfer; if gains are port-dependent, in-domain-only, time-shuffle-sensitive, or need extra heads or a loss sweep; or if any ordinary promotion gate fails. |
 | M3-Ego | Replace flat history with causal endpoint-ego history | Positive context main effect and positive hybrid×ego interaction. | Reject if random, time/feature-matched, or CMES grouping matches it. |
 | M4-Rel | Add directed identity-free endpoint relation bias | Beat no-bias and CMES-Causal; pass relation destruction and endpoint-renaming tests. | Reject if identity is required, relation is unused, or endpoint-held-out performance falls. |
 | M5-Hier | Conditional multi-resolution summaries | Run only if ≥20% valid contexts truncate at 256 and long-horizon recall is deficient; beat non-hierarchical M4-Rel on identical ego history within Thesis resource gates. | Reject if non-hierarchical M4-Rel matches it or runtime cost fails its gate. |
@@ -187,6 +252,17 @@ mechanism survives only if its paired block-bootstrap 95% lower bound is above
 zero on the predeclared low-label cross-domain aggregate. Non-canonical
 alternatives and their comparison rules are fixed in
 [Thesis](Thesis.md#excluded-or-conditional-alternatives).
+
+M2-F is not a prerequisite for M3-Ego. If M2-F rejects, M3-Ego starts from
+M2-H. If M2-F and M3-Ego each pass separately, their combination must beat both
+branches under the common gate before it enters the promoted stack.
+
+Context length is not a JEPA component. If revisited, run one separate
+source-validation ablation using total-token ceilings $W=\{3,8,20\}$, including
+the final target. Left-pad every arm to 20 tokens, hold target anchors and
+optimizer updates fixed, and change only the number of visible earlier events.
+Do not sample a random range, combine this change with M2-F, or replace the
+256-event contract without separate promotion evidence.
 
 ## Promotion, collapse, and scaling
 

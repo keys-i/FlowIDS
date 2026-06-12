@@ -1,13 +1,14 @@
 # Research evidence and novelty ledger
 
-**Cutoff:** 2026-08-17. This is a finite audit of original papers, official
+**Cutoff:** 2026-08-19. This is a finite audit of original papers, official
 artifacts, standards, datasets, and one explicitly labeled systematic
 review—not an exhaustive review. Search coverage includes IEEE Xplore, ACM DL, SpringerLink,
 ScienceDirect, USENIX, arXiv, official standards/data/repositories, and
 backward/forward citation trails. Query families: `NetFlow AND (SSL OR foundation OR transformer
 OR masked)`; `network traffic AND (MAE OR teacher-student OR EMA OR cross-flow
 OR relation)`; `IDS AND (temporal graph OR domain transfer OR few-shot OR
-cross-dataset)`. Venue indexing and repository links were checked where stated;
+cross-dataset)`; and `time series AND (JEPA OR joint embedding OR
+next-latent)`. Venue indexing and repository links were checked where stated;
 an `UNVERIFIED` field means no usable primary-method record was verified here.
 
 **Ledger convention:** the citation states publication status; each following
@@ -25,7 +26,7 @@ cannot support a project claim.
 | M1-R | [MMAE2026](#mmae2026) | Generic masked traffic representation learning | MMAE reconstructs five-packet byte flows with FlowMix; M1-R masks NetFlow feature groups | Code released; reproduction UNVERIFIED | Generic masked-flow novelty rejected |
 | M1-L | [MMAE2026](#mmae2026), [data2vec](#data2vec) | Corrupted student aligned to an unmasked EMA teacher | MMAE aligns reconstructed byte-flow tokens; M1-L targets a causal NetFlow event state | MMAE code released | EMA/latent-target novelty rejected |
 | M2-H | [MMAE2026](#mmae2026) | Reconstruction plus EMA latent alignment | Different modality, corruption, context, and target | MMAE code released | Generic hybrid-objective novelty rejected |
-| M2-F | [CPC](#cpc), [NetFlowGen](#netflowgen) | Predictive representation learning and pretrained NetFlow dynamics | No verified record here uses the exact future endpoint-incident latent/aggregate targets under the proposed causal contract | NetFlowGen code/checkpoint UNVERIFIED | No generic next-step novelty; task-specific formulation is provisional |
+| M2-F | [CPC](#cpc), [IJEPA](#ijepa), [VJEPA](#vjepa), [TSJEPA](#tsjepa), [LeNEPA](#lenepa), [NetFlowGen](#netflowgen) | Predictive latent learning, masked joint embedding, temporal feature prediction, or pretrained NetFlow dynamics; LeNEPA directly covers causal next-latent prediction | The proposed target is a later completed flow incident to either anchor endpoint, encoded with its own causal prefix and tested under external low-label transfer | I-JEPA, V-JEPA, TS-JEPA, and LeNEPA code released but reproduction UNVERIFIED; NetFlowGen code/checkpoint UNVERIFIED | Generic JEPA-family and next-latent novelty rejected; the endpoint-incident causal NetFlow formulation is provisional, not established novelty |
 | M3-Ego | [CMESCrossFlow2026](#cmescrossflow2026), [MMAE2026](#mmae2026), [VanLangendonckGraphFM](#vanlangendonckgraphfm) | Cross-flow organization, corruption, or endpoint topology | CMES is rule-grouped/bidirectional; MMAE uses a support flow as a patch repository; the graph FM is a different dynamic graph unit | CMES model code UNVERIFIED; graph checkpoint UNVERIFIED | System component only, defensible after endpoint-defined past-only causal ablations pass |
 | M4-Rel | [CMESCrossFlow2026](#cmescrossflow2026) | Four-bit/16-type learned cross-flow attention bias | Proposed bits encode directed endpoint equality under a causal mask | Model code UNVERIFIED | No standalone relation-bias novelty; system component only |
 | M5-Hier | [netFound](#netfound), [MM4flow](#mm4flow), [MMAE2026](#mmae2026) | Multi-granularity or multimodal traffic representation | Different units and hierarchy | netFound/MMAE artifacts available; MM4flow reproduction UNVERIFIED | Hierarchy novelty rejected |
@@ -455,15 +456,66 @@ Masked reconstruction; no traffic claim.
 
 A. Baevski *et al.*, “data2vec: A General Framework for Self-Supervised
 Learning in Speech, Vision and Language,” *ICML*, 2022.
-https://proceedings.mlr.press/v162/baevski22a.html. EMA contextual target,
-multimodal; not traffic-specific.
+https://proceedings.mlr.press/v162/baevski22a.html. A masked student predicts
+contextual representations from a full-input EMA teacher, using an average of
+the teacher’s top normalized transformer blocks. This is the direct root for
+M1-L’s same-event EMA target, not a future-prediction objective. It covers
+speech, vision, and language rather than NetFlow and provides no causal-serving
+or external NetFlow-transfer evidence; project reproduction is
+**UNVERIFIED**.
 
 ### IJEPA
 
 A. Assran *et al.*, “Self-Supervised Learning from Images with a Joint-
 Embedding Predictive Architecture,” CVPR, 2023.
 https://openaccess.thecvf.com/content/CVPR2023/html/Assran_Self-Supervised_Learning_From_Images_With_a_Joint-Embedding_Predictive_Architecture_CVPR_2023_paper.html.
-Masked latent prediction; not traffic-specific.
+https://arxiv.org/abs/2301.08243. A context encoder predicts representations
+of masked image target blocks from an EMA target encoder; the target blocks
+come from the same image rather than a future stream. It is peer reviewed and
+establishes generic masked joint-embedding prediction, not causal
+next-event/NetFlow learning. Official code:
+https://github.com/facebookresearch/ijepa. Its reported ImageNet scale and
+vision results are not comparable to this project; reproduction is
+**UNVERIFIED**.
+
+### VJEPA
+
+A. Bardes, Q. Garrido, J. Ponce, X. Chen, M. Rabbat, Y. LeCun, M. Assran, and
+N. Ballas, “Revisiting Feature Prediction for Learning Visual Representations
+from Video,” arXiv:2404.08471, 2024, https://arxiv.org/abs/2404.08471.
+Preprint. V-JEPA predicts latent target features from video context with an
+EMA target encoder. It provides feature-prediction precedent, not NetFlow,
+strictly causal future-only serving, endpoint-disjoint transfer, or an IDS
+result. The paper reports pretraining on two million videos and frozen-backbone
+vision results. Official code: https://github.com/facebookresearch/jepa;
+reproduction is **UNVERIFIED**.
+
+### TSJEPA
+
+S. Ennadir, S. Golkar, and L. Sarra, “Joint Embeddings Go Temporal,”
+arXiv:2509.25449v1, 29 Sep. 2025, https://arxiv.org/abs/2509.25449.
+Preprint; the arXiv record reports acceptance at the *Workshop on Time Series
+in the Age of Large Models*, NeurIPS 2024, but that publication chronology is
+**UNVERIFIED**. The method adapts JEPA-style representation learning to
+univariate time-series classification and forecasting, not NetFlow. It predicts
+uniformly masked time-series patches with a 128-wide, two-head Transformer
+predictor and EMA target encoder; it does not define causal future-only
+pretraining. The paper reports frozen evaluation on sensor and forecasting
+datasets using an NVIDIA V100. Official code:
+https://github.com/Sennadir/TS_JEPA; results are author-reported and
+reproduction is **UNVERIFIED**.
+
+### LeNEPA
+
+A. Chemeris, M. Jin, and R. Balestriero, “LeNEPA: No-Augmentation Next-Latent
+Prediction for Time-Series Representation Learning,” arXiv:2607.00958v1,
+1 Jul. 2026, https://arxiv.org/abs/2607.00958. Preprint; the record reports
+acceptance at the 12th MiLeTS Workshop at KDD 2026. Official code:
+https://github.com/langotime/lenepa-milets-2026. LeNEPA trains causal
+next-latent prediction without augmentation and uses SIGReg, not an EMA
+teacher. It directly removes generic causal next-latent novelty, while its
+NetFlow modality, endpoint-incident target, external-transfer split,
+parameters, compute, and numerical reproduction are **UNVERIFIED**.
 
 ## Tabular, temporal, graph, and state-space roots
 
