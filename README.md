@@ -1,11 +1,23 @@
 # FlowIDS
 
 NetFlow intrusion detection with a supervised baseline (M0) and two pretraining
-methods (M1/M2). Current runs use only `NF-UNSW-NB15-v3`.
+methods (M1/M2). Current runs use only `NF-CSE-CIC-IDS2018-v3`.
 
 ## Run a model
 
-Put the dataset at `data/publish/data/NF-UNSW-NB15-v3.parquet`, then run:
+From the project root, download the single dataset from
+[Hugging Face](https://huggingface.co/datasets/keys-i/netFlow):
+
+```bash
+mkdir -p data
+curl -fL --retry 3 --continue-at - \
+  -o data/NF-CSE-CIC-IDS2018-v3.parquet \
+  'https://huggingface.co/datasets/keys-i/netFlow/resolve/main/data/NF-CICIDS2018-v3.parquet'
+```
+
+The mirror uses the shorter filename `NF-CICIDS2018-v3.parquet` for this
+dataset. All eight model configs read `data/NF-CSE-CIC-IDS2018-v3.parquet`.
+After the download finishes:
 
 ```bash
 pixi install
@@ -100,7 +112,7 @@ For training variation, run distinct seeds with identical settings:
 pixi run model M1 teacher --seed 41
 pixi run model M1 teacher --seed 42
 pixi run model M1 teacher --seed 43
-pixi run plot results/M1-teacher --output results/figures/M1 teacher
+pixi run plot results/M1-teacher --output results/figures/M1-teacher
 ```
 
 Each seed has its own folder. Error bars show one sample standard deviation

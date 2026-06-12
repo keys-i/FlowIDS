@@ -1,8 +1,8 @@
 # Evaluation plan
 
-This is the evaluation plan for the later research ladder, not the M0 baseline.
-M0 uses one NF3 dataset and a chronological 70/15/15 split; see the
-[repository README](../../README.md#m0-baseline). The ladder compares
+This plan describes later experiments. Current M0–M2 runs use only
+NF-CSE-CIC-IDS2018-v3 with a chronological 70/15/15 split; see the
+[repository README](../../README.md#run-a-model). The ladder compares
 [models](Model.md) with the same label budget and false-alert limits.
 
 Here, *scratch* has no pretraining, *frozen* keeps the encoder fixed for the
@@ -23,8 +23,8 @@ establish detection of new zero-days.
 
 | Dataset | Use | Limit |
 |---|---|---|
-| NF-UNSW-NB15-v3, NF-BoT-IoT-v3, NF-ToN-IoT-v3 | IDS and attack-family development | Different benchmark captures do not prove independent operational networks |
-| NF-CSE-CIC-IDS2018-v3 | Held-out benchmark | Already inspected: no pretraining, tuning, adaptation, or threshold selection; a sealed claim needs a new uninspected target |
+| NF-CSE-CIC-IDS2018-v3 | Current M0–M2 training, validation, and test benchmark | Pretrain and fit on the training period only; this dataset cannot also serve as an unseen transfer target |
+| NF-UNSW-NB15-v3, NF-BoT-IoT-v3, NF-ToN-IoT-v3 | Prior exploration only | Excluded from current model runs |
 | Private multi-site traffic | Unlabelled source and approved benign/calibration data | Access needs confirmation; permission to use data does not establish that it is benign |
 | Paired private or public captures | Packet-teacher comparison | A capture and its derivatives stay in one partition; report pairing and privacy limits |
 | CTU-13, UGR'16, LITNET-2020, MAWI, CESNET-TLS-Year22, CIC-IoT-2022 | Optional external tests or probes | Report missing fields or unsuitable time order |
