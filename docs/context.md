@@ -9,7 +9,7 @@ plans; [paper notes](notes/README.md) explain the research.
 ## What exists
 
 - M0 Base, Small, and Matched under `src/m0/`
-- One `NF-UNSW-NB15-v3` chronological 70/15/15 split with a purge
+- One `NF-CSE-CIC-IDS2018-v3` chronological 70/15/15 split with a purge
 - Training and evaluation together in `src/train.py`
 - Data preparation, batching, and context construction in `src/data/dataset.py`
 - `src/main.py:run` owns one path from loading to test predictions
@@ -48,9 +48,9 @@ and GPU performance are still unmeasured.
 - Multi-seed reported metrics
 - GPU throughput and memory profiling
 
-The workspace has no dataset file and no Slurm command has been run. The data
-path and cluster account have been requested, so full runs are blocked on those
-details rather than code work.
+The dataset belongs at `data/NF-CSE-CIC-IDS2018-v3.parquet`; the README includes
+the Hugging Face download command. It has not been downloaded here, and no
+Slurm job has been submitted. Submission needs the real cluster account.
 
 M1/M2 have CPU verification only. M2 future-jepa means future-vector loss
 only; future-hybrid also keeps reconstruction and same-flow teacher loss.

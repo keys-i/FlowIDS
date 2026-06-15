@@ -46,8 +46,11 @@ Defines the NetFlow v9 format.
 
 University of Queensland, “NetFlow Datasets,” https://staff.itee.uq.edu.au/marius/NIDS_datasets/.
 
-Source of the NF3 datasets; current runs use only NF-UNSW-NB15-v3. They are converted benchmarks; results still
-need checking on independent operational traffic.
+Current runs use only [NF-CSE-CIC-IDS2018-v3](https://doi.org/10.48610/ECE9B83).
+The [Hugging Face mirror](https://huggingface.co/datasets/keys-i/netFlow) names
+its file `data/NF-CICIDS2018-v3.parquet`; locally it is saved as
+`data/NF-CSE-CIC-IDS2018-v3.parquet`. This is a converted benchmark; results
+still need checking on independent operational traffic.
 
 ## CICDocs
 

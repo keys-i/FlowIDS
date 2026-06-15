@@ -1,4 +1,4 @@
-SET VARIABLE parquet_file = coalesce(getvariable('parquet_file'), 'data/publish/data/NF-*-v3.parquet');
+SET VARIABLE parquet_file = coalesce(getvariable('parquet_file'), 'data/NF-CSE-CIC-IDS2018-v3.parquet');
 
 -- Total variation is 0 for identical target mixes and 1 for disjoint mixes.
 WITH long AS (
