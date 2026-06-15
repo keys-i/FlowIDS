@@ -1,11 +1,26 @@
 # FlowIDS
 
 NetFlow intrusion detection with a supervised baseline (M0) and two pretraining
-methods (M1/M2). Current runs use only `NF-UNSW-NB15-v3`.
+methods (M1/M2). Current runs use only `NF-CSE-CIC-IDS2018-v3`.
 
 ## Run a model
 
-Put the dataset at `data/publish/data/NF-UNSW-NB15-v3.parquet`, then run:
+Model code lives on `m0`, `m1`, and `m2`. The `m0` branch has three M0
+variants, `m1` has five M0/M1 variants, and `m2` has all eight.
+
+From the project root, download the single dataset from
+[Hugging Face](https://huggingface.co/datasets/keys-i/netFlow):
+
+```bash
+mkdir -p data
+curl -fL --retry 3 --continue-at - \
+  -o data/NF-CSE-CIC-IDS2018-v3.parquet \
+  'https://huggingface.co/datasets/keys-i/netFlow/resolve/main/data/NF-CICIDS2018-v3.parquet'
+```
+
+The mirror uses the shorter filename `NF-CICIDS2018-v3.parquet` for this
+dataset. All eight model configs read `data/NF-CSE-CIC-IDS2018-v3.parquet`.
+After the download finishes:
 
 ```bash
 pixi install
@@ -23,6 +38,18 @@ pixi run model M0 small
 | `pixi run model M2 future-hybrid` | Hybrid loss plus later endpoint-related teacher targets |
 | `pixi run model M2 future-jepa` | Future teacher-vector prediction only |
 
+`model` has a three-hour budget. Add `max` before the model name for 72 hours:
+
+```bash
+pixi run model max M0 small
+```
+
+Both stop earlier if their epoch limit or early stopping is reached. Data
+preparation counts toward the budget. Training reserves the final fifth for
+test evaluation; M1/M2 split the training time between pretraining and
+classification. Each phase also leaves time for validation. Batch counts and
+timings are saved in the histories; three-hour runs may stop partway through an epoch.
+
 Settings live in `tools/config/m0.*.toml`, `m1.*.toml`, and `m2.*.toml`. Pretrained variants
 share a four-layer, 256-wide encoder. The teacher is a moving average of the
 student and receives no gradient updates.
@@ -30,7 +57,15 @@ student and receives no gradient updates.
 Every run uses a chronological 70/15/15 split with a purge around boundaries.
 Preprocessing learns only from the training period. The run prints its device,
 model size, target counts, and epoch losses. Results go to `results/<model>-<variant>/`.
-Use `--evaluate-only` to score the saved checkpoint without training.
+The 72-hour runs use its `max/` subfolder. Use `--evaluate-only` with the same
+command to score its saved checkpoint without training.
+
+Time checks happen between batches. Slow data preparation, batches, or file
+writes can overrun the local budget; Slurm enforces the allocation limit.
+Weights are saved before test evaluation. A run whose full evaluation does
+not finish stays marked incomplete in `status.json` and is excluded from plots.
+If no classification validation finishes, the latest trained weights are saved.
+Pretraining must finish at least one noncollapsed validation before fine-tuning.
 
 ## Follow the code
 
@@ -40,7 +75,7 @@ Start at `run()` in `src/main.py`. Read it from top to bottom:
 2. `fit_preprocess` learns numeric scaling and category IDs from training flows
 3. `make_datasets` builds bounded histories; `make_loader` pads them into batches
 4. M1/M2 run `pretrain`, then every model runs classification with `fit`
-5. The best validation weights score the test period and save predictions
+5. The saved weights score the test period and save predictions
 
 M1/M2 reuse the same feature tensors for pretraining and classification.
 `with_labels` selects scorable targets without rebuilding histories.
@@ -100,7 +135,7 @@ For training variation, run distinct seeds with identical settings:
 pixi run model M1 teacher --seed 41
 pixi run model M1 teacher --seed 42
 pixi run model M1 teacher --seed 43
-pixi run plot results/M1-teacher --output results/figures/M1 teacher
+pixi run plot results/M1-teacher --output results/figures/M1-teacher
 ```
 
 Each seed has its own folder. Error bars show one sample standard deviation
@@ -114,13 +149,27 @@ chosen on validation data. Older runs without `predictions.parquet` need
 From the project root, with Pixi on `PATH` and the dataset available:
 
 ```bash
-sbatch --account=a_yourgroup tools/scripts/slurm.sh
+CONDA_OVERRIDE_CUDA=12.9 pixi install --frozen
+bash tools/scripts/slurm.sh --account=a_yourgroup
 ```
 
-Replace `a_yourgroup` with your account. The array runs one job per variant:
-0 = M0 Base, 1 = Small, 2 = Matched, 3 = M1 reconstruct, 4 = M1 teacher,
-5 = M2 hybrid, 6 = M2 future-hybrid, 7 = M2 future-jepa. Each requests one
-H100, eight CPUs, 128 GB RAM, and 72 hours. Logs go beside that model's results.
+For 72-hour jobs, submit this instead:
+
+```bash
+bash tools/scripts/slurm.sh max --account=a_yourgroup
+```
+
+Replace `a_yourgroup` with your account. On this branch, the array runs
+0 = M0 Base, 1 = Small, 2 = Matched, 3 = M1 reconstruct,
+4 = M1 teacher. Each job requests one
+H100, eight CPUs, 128 GB RAM, and three hours (72 with `max`). Install once before submission;
+jobs use the existing environment. Logs go beside that model's results.
+
+The array has no concurrency cap: all 5 may run together if GPUs and account
+limits allow. Do not add `%2` to `--array` if you want all 5 running at once.
+5 GPUs for three hours use up to 15 GPU-hours; 72 hours allows 360 GPU-hours.
+Queue time is separate. The script sets the [Slurm time limit](https://slurm.schedmd.com/sbatch.html#OPT_time)
+when it submits the array. Full-data H100 runtime has not been measured.
 
 ## Other commands
 

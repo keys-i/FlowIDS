@@ -9,7 +9,7 @@ plans; [paper notes](notes/README.md) explain the research.
 ## What exists
 
 - M0 Base, Small, and Matched under `src/m0/`
-- One `NF-UNSW-NB15-v3` chronological 70/15/15 split with a purge
+- One `NF-CSE-CIC-IDS2018-v3` chronological 70/15/15 split with a purge
 - Training and evaluation together in `src/train.py`
 - Data preparation, batching, and context construction in `src/data/dataset.py`
 - `src/main.py:run` owns one path from loading to test predictions
@@ -24,6 +24,7 @@ plans; [paper notes](notes/README.md) explain the research.
 - All variants use the same single NF3 dataset
 - Saved per-flow predictions and `pixi run plot` for figures and error examples
 - `--seed` writes separate runs; comparison error bars show sample standard deviation
+- `model` uses a three-hour budget; `model max` allows 72 hours and writes under `max/`
 - Static checks through `pixi run lint`; no test directory
 
 M0 is a FlowTransformer-style baseline with local implementation changes. It
@@ -48,9 +49,9 @@ and GPU performance are still unmeasured.
 - Multi-seed reported metrics
 - GPU throughput and memory profiling
 
-The workspace has no dataset file and no Slurm command has been run. The data
-path and cluster account have been requested, so full runs are blocked on those
-details rather than code work.
+The dataset belongs at `data/NF-CSE-CIC-IDS2018-v3.parquet`; the README includes
+the Hugging Face download command. It has not been downloaded here, and no
+Slurm job has been submitted. Submission needs the real cluster account.
 
 M1/M2 have CPU verification only. M2 future-jepa means future-vector loss
 only; future-hybrid also keeps reconstruction and same-flow teacher loss.
@@ -58,9 +59,10 @@ Few-label and cross-network comparisons remain planned; M3 and later are not imp
 
 ## Cluster run
 
-On Bunya, the [array launcher](../tools/scripts/slurm.sh) runs one job per
-variant across M0 Base/Small/Matched, M1 reconstruct/teacher, and all three M2 variants, writing to
-`results/<model>-<variant>/`. It still needs the real Slurm account before submission.
+The [README](../README.md#run-on-bunya) selects three or 72 hours for the
+5 variants available on this branch. The `m2` branch runs all eight.
+Jobs need the real Slurm account. Incomplete runs stay out of plots; H100
+runtime remains unmeasured.
 
 ## Conventions
 

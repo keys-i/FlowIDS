@@ -61,16 +61,15 @@ def clean() -> None:
 def lint() -> None:
     """Run formatting, linting, type checks, and self-checks
 
-    Checks data splits, metrics, and M1/M2 forward/backward passes after static checks pass
+    Checks data splits, metrics, batch time limits, and M1 forward/backward passes
     """
     run("ruff", "format", "--check", "src", "tools", "--config", RUFF)
     run("ruff", "check", "src", "tools", "--config", RUFF)
     run("basedpyright", "--project", BASEDPYRIGHT)
     run(sys.executable, "-m", "src.data.load")
     run(sys.executable, "-m", "src.metrics")
+    run(sys.executable, "-m", "src.train")
     run(sys.executable, "-m", "src.m1.network")
-    run(sys.executable, "-m", "src.m2.data")
-    run(sys.executable, "-m", "src.m2.network")
 
 
 COMMANDS = {

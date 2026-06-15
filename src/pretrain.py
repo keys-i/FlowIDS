@@ -1,4 +1,4 @@
-"""Pretrain M1/M2 on training flows and select weights on masked validation loss"""
+"""Pretrain M1 on training flows and select weights on masked validation loss"""
 
 import json
 import math
@@ -13,8 +13,7 @@ from torch.utils.data import DataLoader
 from src.config import Config
 from src.m1.masking import sample_mask
 from src.m1.network import Pretrainer
-from src.m2.network import M2Pretrainer
-from src.train import Batch, move, setup_optimizer
+from src.train import Batch, TimeLimit, batches, move, setup_optimizer
 
 
 def spread(states: Tensor) -> dict[str, float]:
@@ -46,7 +45,12 @@ def spread(states: Tensor) -> dict[str, float]:
 
 @torch.no_grad()
 def validate(
-    model: Pretrainer, loader: DataLoader[Batch], config: Config, device: torch.device
+    model: Pretrainer,
+    loader: DataLoader[Batch],
+    config: Config,
+    device: torch.device,
+    *,
+    deadline: float = math.inf,
 ) -> tuple[float, dict[str, float]]:
     """Score fixed validation masks and sample vectors for collapse diagnostics
 
@@ -55,6 +59,7 @@ def validate(
         loader: Unlabeled validation histories, never final test flows
         config: Masking settings and run seed
         device: Inference device
+        deadline: Raise TimeLimit if validation cannot finish in time
 
     Returns:
         Example-weighted masked loss and, for teacher models, teacher/student diagnostics
@@ -70,7 +75,7 @@ def validate(
     try:
         # Fixed validation masks must not advance the training random stream
         with torch.random.fork_rng(devices=[]):
-            for index, batch in enumerate(loader):
+            for index, batch in enumerate(batches(loader, deadline)):
                 batch = move(batch, device)
                 mask = sample_mask(
                     batch["padding"].cpu(),
@@ -99,71 +104,16 @@ def validate(
         _ = model.train(training)
 
 
-@torch.no_grad()
-def balance_losses(
-    model: M2Pretrainer, loader: DataLoader[Batch], config: Config, device: torch.device
-) -> dict[str, float | int]:
-    """Set inverse-median weights from 200 training-only forward batches
-
-    No optimizer or teacher updates run here. Small loaders repeat without caching
-    batches; the weights sum to two and stay fixed for the rest of pretraining
-    """
-    if not len(loader):
-        raise ValueError("loss balancing requires a nonempty training loader")
-    training = model.training
-    _ = model.eval()
-    started = perf_counter()
-    values: list[Tensor] = []
-    exposures = future_exposures = 0
-    generator = torch.Generator().manual_seed(config.run.seed)
-    try:
-        with torch.random.fork_rng(devices=[]):
-            batches = iter(loader)
-            for _ in range(200):
-                try:
-                    batch = next(batches)
-                except StopIteration:
-                    batches = iter(loader)
-                    batch = next(batches)
-                batch = move(batch, device)
-                mask = sample_mask(
-                    batch["padding"].cpu(),
-                    config.pretrain.mask_fraction,
-                    config.pretrain.span,
-                    generator=generator,
-                ).to(device)
-                losses, _, _ = model.losses(batch, mask)
-                values.append(losses.cpu())
-                exposures += int((~batch["padding"]).sum())
-                if "future_padding" in batch:
-                    future_exposures += int((~batch["future_padding"]).sum())
-        medians = torch.stack(values).quantile(0.5, dim=0)
-        if not torch.isfinite(medians).all() or (medians <= 0).any():
-            raise ValueError("loss warm-up needs finite positive median losses")
-        weights = medians.reciprocal()
-        _ = model.loss_weights.copy_((2 * weights / weights.sum()).to(device))
-        return {
-            "warmup_batches": 200,
-            "warmup_seconds": perf_counter() - started,
-            "warmup_exposures": exposures,
-            "warmup_future_exposures": future_exposures,
-            **{
-                f"weight_{name}": float(weight)
-                for name, weight in zip(model.loss_names, model.loss_weights, strict=True)
-            },
-        }
-    finally:
-        _ = model.train(training)
-
-
 def pretrain(
     model: Pretrainer,
     train_loader: DataLoader[Batch],
     validation_loader: DataLoader[Batch],
     config: Config,
     device: torch.device,
+    *,
+    deadline: float = math.inf,
 ) -> list[dict[str, float | int]]:
-    """Pretrain M1/M2 and restore the best noncollapsed validation weights
+    """Pretrain M1 and restore the best noncollapsed validation weights
 
     Args:
         model: Student and prediction components
@@ -171,6 +121,7 @@ def pretrain(
         validation_loader: Unlabeled validation histories
         config: Pretraining and shared optimizer settings
         device: Training device
+        deadline: Phase cutoff, with the last fifth reserved for validation
 
     Returns:
         Loss, exposure, timing, and spread history
@@ -191,65 +142,78 @@ def pretrain(
     optimizer, scheduler = setup_optimizer(model, train, steps)
     amp = bool(train.amp and device.type == "cuda")
     scaler = torch.amp.GradScaler("cuda", enabled=amp)
-    calibration = (
-        balance_losses(model, train_loader, config, device)
-        if isinstance(model, M2Pretrainer) and len(model.loss_names) > 1
-        else {}
-    )
+    train_deadline = perf_counter() + (deadline - perf_counter()) * 0.8
     history: list[dict[str, float | int]] = []
     best_state: dict[str, Tensor] = {}
     best_loss = float("inf")
     stale = collapsed = updates = exposures = future_exposures = 0
     momentum = pre.ema_start
     for epoch in range(1, pre.epochs + 1):
+        if perf_counter() >= train_deadline:
+            break
         _ = model.train()
         started = perf_counter()
         loss_total = torch.zeros((), device=device)
         count = 0
-        for batch in train_loader:
-            batch = move(batch, device)
-            mask = sample_mask(batch["padding"], pre.mask_fraction, pre.span)
-            optimizer.zero_grad(set_to_none=True)
-            with torch.autocast(device_type=device.type, enabled=amp):
-                loss, _, _ = model(batch, mask)
-            if not torch.isfinite(loss):
-                raise ValueError("pretraining loss is not finite")
-            scaler.scale(loss).backward()
-            _ = scaler.unscale_(optimizer)
-            _ = torch.nn.utils.clip_grad_norm_(model.parameters(), train.gradient_clip)
-            previous_scale = scaler.get_scale()
-            _ = scaler.step(optimizer)
-            _ = scaler.update()
-            if scaler.get_scale() >= previous_scale:
-                momentum = (
-                    pre.ema_start
-                    + (pre.ema_end - pre.ema_start)
-                    * (1 - math.cos(math.pi * updates / max(steps - 1, 1)))
-                    / 2
-                )
-                model.update_teacher(momentum)
-                scheduler.step()
-                updates += 1
-            loss_total += loss.detach() * len(mask)
-            count += len(mask)
-            exposures += int((~batch["padding"]).sum())
-            if "future_padding" in batch:
-                future_exposures += int((~batch["future_padding"]).sum())
+        try:
+            for batch in batches(train_loader, train_deadline):
+                batch = move(batch, device)
+                mask = sample_mask(batch["padding"], pre.mask_fraction, pre.span)
+                optimizer.zero_grad(set_to_none=True)
+                with torch.autocast(device_type=device.type, enabled=amp):
+                    loss, _, _ = model(batch, mask)
+                if not torch.isfinite(loss):
+                    raise ValueError("pretraining loss is not finite")
+                scaler.scale(loss).backward()
+                _ = scaler.unscale_(optimizer)
+                _ = torch.nn.utils.clip_grad_norm_(model.parameters(), train.gradient_clip)
+                previous_scale = scaler.get_scale()
+                _ = scaler.step(optimizer)
+                _ = scaler.update()
+                if scaler.get_scale() >= previous_scale:
+                    momentum = (
+                        pre.ema_start
+                        + (pre.ema_end - pre.ema_start)
+                        * (1 - math.cos(math.pi * updates / max(steps - 1, 1)))
+                        / 2
+                    )
+                    model.update_teacher(momentum)
+                    scheduler.step()
+                    updates += 1
+                loss_total += loss.detach() * len(mask)
+                count += len(mask)
+                exposures += int((~batch["padding"]).sum())
+                if "future_padding" in batch:
+                    future_exposures += int((~batch["future_padding"]).sum())
+        except TimeLimit:
+            print("Pretraining time used; finishing validation")
+        if not count:
+            break
         train_loss = float(loss_total) / count
         seconds = perf_counter() - started
-        validation_loss, diagnostics = validate(model, validation_loader, config, device)
+        started = perf_counter()
+        try:
+            validation_loss, diagnostics = validate(
+                model, validation_loader, config, device, deadline=deadline
+            )
+        except TimeLimit:
+            if not best_state:
+                raise TimeLimit("pretraining needs one complete, noncollapsed validation") from None
+            print("Pretraining validation timed out; keeping the earlier best weights")
+            break
         entry: dict[str, float | int] = {
             "epoch": epoch,
             "train_loss": train_loss,
+            "train_targets": count,
             "validation_loss": validation_loss,
             "train_seconds": seconds,
+            "validation_seconds": perf_counter() - started,
             "targets_per_second": count / seconds,
             "exposures": exposures,
             "future_teacher_exposures": future_exposures,
             "updates": updates,
             "ema_momentum": momentum,
             **diagnostics,
-            **calibration,
         }
         width = model.encoder.record.numeric.out_features
         bad = any(
