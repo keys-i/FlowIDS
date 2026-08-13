@@ -7,11 +7,8 @@
 __pycache__/
 *.py[cod]
 *.so
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.coverage
-.coverage.*
+.*_cache/
+.coverage*
 htmlcov/
 build/
 dist/
@@ -20,21 +17,16 @@ dist/
 # Virtual environments
 .venv/
 venv/
-env/
-ENV/
-.conda/
+[eE][nN][vV]/
+.pixi/
 .python-version
 
 # Jupyter
 .ipynb_checkpoints/
 
 # Data and artifacts
-notebook/experiment/*
 *.duckdb
-data/v*/
-data/raw/
-data/interim/
-data/processed/
+/data/
 datasets/
 artifacts/
 outputs/
@@ -47,8 +39,7 @@ cache/
 checkpoints/
 weights/
 *.ckpt
-*.pt
-*.pth
+*.pt*
 *.pkl
 *.joblib
 *.h5

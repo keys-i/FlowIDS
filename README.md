@@ -1,39 +1,16 @@
-# FlowGraphNet
+# FlowIDS
 
 Initial project scaffold for a deep learning model repository.
 
 ## Setup
 
-Create the environment:
-
 ```bash
-conda env create -f environment.yml
-conda activate flowIDS
+pixi install
+pixi run check
 ```
 
-Update the environment after changing dependencies:
+Run a Parquet exploration query from the repository root:
 
 ```bash
-conda env update -f environment.yml --prune
+pixi run duckdb < tools/scripts/exploration/profile.sql
 ```
-
-## Repo Structure
-
-```bash
-flowIDS
-├── README.md
-├── assets
-├── docs
-├── environment.yml             # reproducible environment
-├── notebooks
-│   └── experiments             # experiments done in colab
-├── scripts                     # helper scripts
-└── src                         # main model codebase
-```
-
-## Notes
-
-This repository is currently a starting point.
-
-> [!IMPORTANT]
-> TODO: Add model code, training scripts, notebooks, and dataset documentation as the project develops.
