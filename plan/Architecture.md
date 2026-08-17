@@ -1,142 +1,313 @@
 # Architecture contract
 
-This is a future implementation contract, not a public API or a claim about
-the current repository. The model and research scope are specified alongside
-[Model](Model.md), [Thesis](Thesis.md), and the cited prior-art anchors in
-[Refs](Refs.md).
+This is the sole data, tensor, causal-state, and deployment contract for the
+proposed system. It defines future implementation behaviour, not a public API.
+Model objectives and promotion gates belong in [Model](Model.md); study claims,
+datasets, and evaluation tracks belong in [Thesis](Thesis.md); source evidence
+and prior art belong in [Refs](Refs.md).
 
-## Dataflow
+## Boundary and dataflow
 
-`versioned traffic → audit → portable NetFlow → causal ego history → record
-encoder → causal Transformer → final-flow representation → heads`
+```text
+versioned source -> provenance audit -> portable FlowRecord -> causal endpoint
+history -> field tokenizer -> causal Transformer -> completed-flow embedding ->
+task head
+```
 
-Every arrow is versioned and auditable. A source record is retained with its
-conversion evidence; the portable record is the only primary model input;
-context is formed only from completed earlier flows; and the representation
-used by every head is the target flow's final causal state. No label is loaded
-in self-supervised learning (SSL).
+The prediction unit is one completed bidirectional flow. A unidirectional
+source is usable only after a documented causal pairing rule produces a
+completed bidirectional record; otherwise it is excluded. Source records,
+conversions, and packet captures never cross a capture/exporter observation
+boundary in context construction.
 
-### Provenance and portability
+`explore` supplies useful DuckDB audit queries. Its query output is not
+immutable D0 evidence: D0 requires versioned source files, frozen audit output,
+and the artifacts below.
 
-A conceptual `DatasetManifest` records dataset/version, raw and converted
-hashes, capture lineage, site, collector, exporter, meter and timeouts, time
-range, schema, licence, and label provenance. A conceptual `FeatureSchema`
-records each raw name, units, semantics, role, type, transform, mask group,
-and compatibility status. These manifests are immutable inputs to conversion,
-training, evaluation, and replay.
+## Versioned artifacts and isolation
 
-The primary portable view excludes raw IP and MAC addresses, flow ID, labels,
-absolute timestamps, capture/day/scenario fields, and post-hoc metadata.
-Endpoint addresses may be used only for split grouping, causal routing, and
-equality tests. State holds only per-capture keyed endpoint hashes; those
-hashes are never model inputs or embeddings. Source/destination orientation
-must have stable, documented meter semantics; otherwise directed relation
-experiments for that source are unsupported.
+| Artifact | Required content | Isolation/invariant |
+|---|---|---|
+| `DatasetManifest` | Dataset/version; source and converted hashes; capture lineage; site, collector, exporter, meter and timeout/version; time range/timezone; schema hash; licence; label provenance. | A capture and every derivative share one lineage ID. |
+| `FeatureSchema` | Raw name, units, semantics, type, portable role, transform, semantic mask group, and cross-corpus status. | Derived from source metadata, never inferred from labels. |
+| `FlowRecord` | Lineage and capture IDs; interval and completion time; typed observable fields; field-presence mask; audit routing keys. | Raw endpoints are routing-only; labels and post-hoc fields are absent. |
+| `PacketPair` | Flow-to-packet-span mapping; canonical pairing evidence; confidence; ambiguity status. | Exists only for Q3 sources; ambiguous records are discarded. |
+| `SplitManifest` | Source hashes; partition; chronological range; entity/session/campaign groups; purge interval; retained event IDs; exact/near contract and membership hashes; context membership hashes; pretraining visibility. | It is the single authority for partition, fit scope, and state reset. |
+| `LabelTable` | Reviewed raw-to-canonical label map; label provenance; supported/unsupported status. | Physically and logically unavailable to canonicalization and the SSL dataloader. |
+| `ContextBatch` | Numeric values; categorical IDs; field-presence and missing masks; explicit semantic-group mask; padding and causal masks; elapsed-time features; optional 16-type relation matrix. | Target is final; every history event completed earlier than it. |
+| `RunManifest` | Git/config/data/split hashes; seeds; loss definition and frozen weights; parameters, FLOPs, unique flows and exposures; hardware/software; checkpoint rule. | Written before training and retained with output. |
+| Checkpoint bundle | Encoder weights; preprocessing state; vocabulary; feature/label schema; data, split, and run hashes. | Sufficient for deterministic offline replay of the served encoder. |
 
-Ports are exact tokens only for 0–1023. Higher ports receive a train-only
-frequency bucket plus a `registered` (1024–49151) or `dynamic` (49152–65535)
-range token; `missing` and `unknown` remain distinct. Every result includes a
-mandatory port-free ablation. `L7_PROTO` is excluded from the primary view
-unless extractor semantics are equal across sources and it is not a label
-proxy.
+No artifact is added by this documentation change. A persisted artifact is
+versioned, content-addressed, and immutable once referenced by a run.
 
-Numeric features use train-partition median imputation plus a missing indicator,
-`log1p` for non-negative values, train-only 1st/99th-percentile clipping, then
-z-scoring. Categorical vocabularies are train-only. Encode clipped `log1p`
-time since the preceding observed flow and since the preceding flow sharing
-either endpoint; never encode wall-clock or absolute capture time. Label maps
-are explicitly reviewed; unsupported labels remain `unsupported`, never
-silently remapped.
+## Source quality and capture lineage
 
-### Curation and splits
+Every source is classified before use.
 
-The source unit is `(site, collector, capture lineage, calendar block, schema)`.
-Reject any source with unknown lineage, time, semantics, or licence. All
-conversions of one underlying PCAP are atomic. Remove exact exported-record
-duplicates before splitting; cluster near-identical deployable records without
-deleting legitimate recurrence; and group similar contexts with
-semantic-event MinHash. Near-duplicate and context-linked groups are
-indivisible. Scored cross-partition overlap must be zero unresolved.
+A provenance-disjoint source unit is the smallest stable combination of site,
+collector/exporter observation point, capture lineage, calendar block, and
+schema. Units sharing any underlying capture are one source for scaling counts.
 
-Entity, campaign, and time partitioning happens before preprocessing. A
-conceptual `SplitManifest` stores files and hashes, time ranges, entity and
-campaign groups, purge rules, row and context hashes, and pretraining
-visibility. It is the authority for all preprocessing fits and for replay.
-Synthetic flows are excluded from the foundation corpus and may appear only in
-benchmarks. Sealed lineage is never visible during pretraining. Reject the
-experiment if exact sealed-flow overlap exceeds 1%, high-similarity context
-overlap exceeds 0.1%, held-out lineage appears in pretraining, an
-identifier-only classifier has material predictive power, or manifest replay
-does not reconstruct the split. Any residual scored overlap remains zero.
+| Tier | Minimum evidence | Permitted use |
+|---|---|---|
+| Q0 | Provenance, timing, schema, or rights are missing or unresolved. | Exclude entirely when use rights or field semantics are unresolved. Otherwise allow quarantined benchmark reproduction/diagnostics only; exclude from the core corpus, source-diversity counts, ladder promotion, and transfer/operational/foundation claims. |
+| Q1 | Valid provenance, schema, and completion-time ordering; incident state may be unknown. | General SSL only. |
+| Q2 | Q1 plus independently reviewed clean interval. | Q1 uses plus benign-only fitting and threshold calibration. |
+| Q3 | Q2 plus deterministic PCAP-to-flow pairing meeting the contract below. | Q2 uses plus optional packet-teacher work. |
 
-Source sampling is `p(d) ∝ n_d^α`, with `α ∈ {0, .5, 1}` selected once at S0;
-use 0.5 only if it beats both controls. Each source has a 20% cap and excess
-mass is redistributed across uncapped sources. The selected source mixture and
-sequence are manifested.
+A PCAP, its exported NetFlow/CSV/Parquet conversions, resampling, redaction,
+and duplicate exports are atomic capture derivatives. They occupy one source
+lineage and one partition. A source with unknown lineage, time range, feature
+meaning, meter semantics, or licence is Q0. Q0 never enters the core corpus. A
+source with unresolved use rights or field meaning is excluded entirely. Other
+Q0 material may enter a quarantined benchmark run that executes only checks
+whose prerequisites are present; missing grouping/provenance gates stay
+explicitly blocked, and a duplicate match cannot raise the tier.
 
-### Causal ego history
+### Exact and NF3-v1 duplicate grouping
 
-For a target completed at `t`, select the latest 128 earlier source-incident
-and 128 earlier destination-incident flows. Union, deduplicate, and order them
-by flow end time, breaking ties with an audit-only deterministic key. The
-source-selected horizon is one of `{1, 10, 60}` minutes. Context contains at
-most 255 history records plus the target and never crosses data source,
-capture, exporter, split, or time boundaries.
+Exact-record and strict deterministic near groups are hard split groups, not a
+row-deduplication instruction: every retained occurrence and its multiplicity
+remain represented. Exact-record equality is HMAC-SHA-256 equality over the
+canonical typed serialization of every non-target exported field, using the
+same lineage-scoped secret as the endpoint routing keys. Labels and derived
+targets are excluded; the plaintext serialization and an unkeyed digest
+containing endpoint values are never persisted.
 
-`ContextBatch` conceptually contains numeric, categorical, missingness,
-group/padding, causal, and relative-time masks, plus an optional 16-relation
-matrix. Streaming state has explicit expiry. Offline replay and streaming must
-produce identical IDs, order, masks, and relations. Mutating future or padding
-items must leave earlier outputs bitwise unchanged in deterministic mode.
+`NF3-v1` compares records only within the same declared capture lineage and
+observation domain. Its fixed canonical typed tuple is lineage ID; observation
+domain ID; `HMAC-SHA-256(K_lineage, canonical endpoint bytes)` in the declared
+source and destination slots; exact `L4_SRC_PORT`, `L4_DST_PORT`, `PROTOCOL`,
+`FLOW_START_MILLISECONDS`, `FLOW_END_MILLISECONDS`, `IN_PKTS`, `OUT_PKTS`,
+`IN_BYTES`, `OUT_BYTES`, `TCP_FLAGS`, `CLIENT_TCP_FLAGS`, and
+`SERVER_TCP_FLAGS`; then the presence mask for those fields. Timestamp
+tolerance is zero. No other field participates: labels and exporter-derived
+secondary fields are excluded. Sort by this tuple and assign each equal-key run
+one group while retaining every member. MinHash, LSH, fuzzy distance, tolerance
+windows, and transitive or connected-component closure are forbidden
+([grouping evidence](Refs.md#duplicate-grouping-evidence)).
 
-For endpoint-disjoint evaluation, hold out principals, purge cross-boundary
-flows, reset state, and admit only earlier history from the same test partition.
+Freeze `contract_hash = SHA-256(JCS(contract))` for the exact-record and
+`NF3-v1` contracts; each document includes its version, typed field order and
+normalization, equality rule, and boundary policy, plus the HMAC algorithm and
+non-secret key identifier/scope where applicable. For every group, freeze
+`membership_hash = SHA-256(JCS(membership))`; that document contains the
+contract hash, key hash, and sorted event IDs with one entry per retained
+occurrence. HMAC secrets are never manifested.
+If a hard group meets a chronological boundary, assign all retained members to
+the later partition or purge the earlier members; never move a later member
+into training. All hashes and parameters are frozen before model fitting.
 
-### Relation bias and encoder
+Semantic context similarity is diagnostic only: record its frozen method and
+score distribution, but do not use it to assign partitions or pass D0. It may
+become a thresholded hard gate only after independently known repeat-export
+positives justify a predeclared equivalence rule, threshold, and error
+assessment in a versioned contract revision
+([context-similarity evidence](Refs.md#context-similarity-evidence)).
 
-Each causally visible ordered event pair has four equality bits:
-`src-src`, `dst-dst`, `src-earlier-dst`, and `dst-earlier-src`. Their 16
-combinations form relation types. A learned scalar per layer and head is added
-to causal-attention logits for each type. Raw endpoint identities are never
-embedded. Renaming endpoints consistently must preserve outputs; relation
-destruction controls preserve relation and relative-time marginals.
+On labelled sources, run a shallow tree for each candidate model field and a
+separate identifier-only tree over audit fields, both on grouped validation
+data. Balanced accuracy or AUROC at least 0.99 triggers a source/split
+investigation; exclude any implicated model-visible proxy or revise the split,
+then rerun the complete audit. Audit-only identifiers remain forbidden
+regardless of score. Synthetic traffic is excluded from the core corpus.
 
-The record encoder consumes the portable record and its masks. A causal
-Transformer consumes the ordered context and returns the final-flow
-representation. This differs from CMES: CMES uses four bits for endpoint,
-destination-port, protocol, and feature similarity in supervised,
-bidirectional, sorted-group context; this contract uses endpoint-equality bits
-only in causal history ([Refs: CMES](Refs.md#cmescrossflow2026)). It also differs from MMAE:
-MMAE's support flow is a corruption source for packet patches, not a separately
-encoded endpoint-history record ([Refs: MMAE](Refs.md#mmae2026)).
+During pretraining, source `d` is sampled with
+`p(d) proportional to n_d^alpha`, where `n_d` is its post-filter unique-flow
+count and `alpha` is selected once at S0 from `{0, 0.5, 1}`. No source may
+exceed 20% probability; redistribute excess mass across uncapped sources.
+Freeze the selected source sequence by seed and record its hash. Use
+`alpha=0.5` only if it beats both controls under the S0 transfer screen.
 
-## Heads and runtime
+### D0 acceptance evidence
 
-Conceptual output heads are binary attack, supported family, defensible
-application/service, and one-class or energy scoring for zero-label settings.
-Unsupported labels are not family targets. Bidirectional variants are
-nondeployable and evaluation-only.
+Every applicable item below must pass before a source or result enters the claim-bearing
+model ladder. A Q0 benchmark-only run sits outside that ladder: it may execute
+only supported checks, must report every unavailable gate as blocked, and
+cannot promote a rung. A query that merely prints a count is not a gate; its
+frozen result and pass/fail rule are part of the run evidence.
 
-Runtime is causal per completed flow, with dynamic batching and wait no greater
-than 5 ms. Report p50/p95/p99 latency, flows/s, device memory, state memory,
-and optional-field missingness behaviour. Missing optional fields use the
-defined missing tokens. A checkpoint bundle includes weights, preprocessing,
-vocabularies, schemas, manifests, and selection evidence. A conceptual
-`RunManifest` records git/config/data/split hashes, seeds, loss weights,
-parameters, FLOPs, exposures, hardware, software, and checkpoint selection.
+| Check | Required evidence |
+|---|---|
+| Conversion parity | Reconcile source/output rows and every dropped record; verify units, directionality, missingness, completion timestamps, and chronological ordering against source metadata and sampled raw records. |
+| Input isolation | Schema and batch assertions prove labels, raw identifiers, capture metadata, and post-hoc fields cannot enter canonicalization or SSL tensors. |
+| Split isolation | Exact-record and `NF3-v1` groups never cross a partition in any track. Each track additionally isolates its declared factor: time with boundary purge, endpoint principals, complete family/campaign units, or source/capture lineage. Post-split contexts share zero event IDs across partitions. Semantic context similarity is diagnostic, not a pass/fail criterion. |
+| Fit scope | Changing validation/test records cannot alter training transforms, vocabularies, buckets, duplicate parameters, or feature selection. |
+| Causality and state | Future/padding mutation leaves earlier outputs unchanged; offline replay equals streaming construction; partition reset prevents state crossing. |
+| Reproducibility | The same inputs and seeds reproduce artifact hashes, retained event IDs, contexts, and split assignments. |
+| Q3 pairing (Q3/X1-Distill only) | Ambiguous or boundary-crossing matches are rejected and the audited precision gate below passes. |
+| Release isolation | Checkpoints, logs, and released manifests contain no payload, raw endpoint, re-identifying pair map, or private per-event embedding. |
 
-## Conditional extensions
+## Canonical feature view
 
-M5 exists only if at least 20% of contexts truncate and long-horizon evidence
-is deficient. It uses permutation-equivariant 1 s/10 s/60 s event windows, one
-summary per window, a causal summary Transformer, and retains current fine
-events. It adds no GNN, SSM/Mamba, memory module, or generative decoder.
+The headline view is one schema frozen before training as the semantic
+intersection of completion-observable fields across every domain in the
+primary claim: protocol; service-aware ports; directional packet/byte volume;
+duration; TCP flags; and compatible packet-size, retransmission, and
+inter-arrival summaries. It is unchanged across primary domains and tasks so a
+single checkpoint is testable. A pair-specific intersection is a secondary
+sensitivity analysis, never headline evidence.
 
-X1 packet teacher exists only behind a privacy/legal gate. Source PCAP and its
-generated NetFlow must join one-to-one by capture, bidirectional five-tuple,
-and exact time overlap; reject ambiguous pairs. No evaluation capture may
-train the teacher. A frozen teacher consumes sizes, directions, timings, and
-protocol bytes; the student consumes portable NetFlow only; completed-flow
-latents align; and no teacher is deployed. Required controls are flow SSL,
-same-modality larger teacher, random teacher, shuffled alignment, and frozen
-versus full-student training.
+The secondary view may include source-specific compatible fields and has an
+explicit field-presence mask. It must never replace the headline view, and its
+results are labelled secondary. Missing is distinct from zero in both views.
+
+The primary view excludes IP/MAC addresses, flow IDs, labels, absolute
+timestamps, capture/day/scenario IDs, hostnames, collector/template IDs, and
+post-hoc metadata. Endpoint values may produce only the lineage-scoped HMAC
+routing keys defined above, retaining declared source/destination position, for
+split grouping, causal lookup, and anonymous equality relations. Those keys,
+raw values, and any stable endpoint embedding never enter model tensors.
+Directed experiments require stable, documented source/destination semantics.
+
+Ports use exact tokens for 0--1023. A higher training port receives one of
+eight quantile buckets by training-only occurrence frequency plus a
+`REGISTERED` (1024--49151) or `DYNAMIC` (49152--65535) range token; an unseen
+higher port receives `UNK` plus its range. Keep separate `PAD` and `MISSING`
+tokens. A port-free result is mandatory.
+`L7_PROTO` is excluded from the headline view. It may enter the secondary view
+only when extractor semantics are equivalent across the relevant sources and it
+is not a task-label proxy.
+
+Numeric processing is fit on the permitted training partition only: median
+imputation, a missingness indicator, `log1p` for non-negative heavy-tailed
+fields, 1st/99th percentile clipping, then z-score scaling. Categorical
+vocabularies and port-frequency buckets are likewise training-only. Time input
+is clipped `log1p` elapsed time since the preceding observed flow and since the
+preceding flow sharing either endpoint; wall-clock and absolute capture time
+are forbidden. Reviewed labels remain in `LabelTable`; unsupported classes stay
+unsupported and are never fuzzy-matched or silently folded into another class.
+
+## Causal context and tensors
+
+Construct contexts separately for each partition only after the frozen split
+and boundary policy have been applied and endpoint state has been reset. The
+cross-partition context audit must find zero shared event IDs and zero exact or
+`NF3-v1` group IDs represented on both sides. Canonical context membership
+hashes are replay and shared-event evidence, not semantic group IDs.
+
+Every context draws from flows completed before target time `t` in the same
+source, capture, exporter, partition, and selected 1/10/60-minute horizon.
+Break equal completion times with a deterministic audit-only event key. Append
+the completed target last and cap the full sequence at 256 tokens. No control
+may change these boundaries, ordering rules, target position, or state reset.
+
+M0 through M2-F use flat history: retain the latest 255 eligible collector
+events irrespective of endpoint. M3-Ego replaces that selection rule by
+retrieving the latest 128 eligible events incident to the target source and the
+latest 128 incident to its destination, then unioning, deduplicating, ordering,
+and retaining the latest 255. For the M3-Ego screen, let `h` be that ego
+history's event count and use exactly `h` events in every history-matched
+control; target-only remains the deliberate zero-history ablation:
+
+- `flat-matched`: the latest `h` eligible collector events;
+- `random-matched`: the `h` non-incident candidates with the lowest
+  `SHA-256(run_seed || target_event_id || candidate_event_id)` values;
+- `time-feature-matched`: for each ego event from newest to oldest, select the
+  unused non-incident candidate minimizing protocol mismatch, port-range
+  mismatch count, absolute completion-lag difference, then L1 distance over
+  frozen train-only transformed duration/byte/packet fields, with event ID as
+  final tie-breaker;
+- `target-only`: no history event.
+
+If a non-incident control has fewer than `h` candidates, mark that target
+unsupported for the matched comparison; never backfill across a boundary.
+
+For the endpoint-disjoint track, assign held-out endpoint principals before
+context construction. A flow whose two endpoints are held belongs to the
+target partition; a flow joining a held and unheld endpoint is purged; all
+other flows belong to the source partition. Reset state, and admit only earlier
+flows from the same target partition at test time.
+
+Offline replay and streaming construction must emit identical event IDs, order,
+padding, causal masks, relation types, and elapsed-time features. Future events
+and padding must leave an earlier deterministic output bitwise unchanged.
+Endpoint state expires at the selected horizon. At every adaptation,
+calibration, or test boundary, clear state; within a partition, test state may
+contain only its own earlier completed flows.
+
+`ContextBatch` represents semantic masking as a distinct `[batch, event,
+group]` boolean mask, not missingness or padding. The five groups are transport
+and flags; service and ports; directional volume; packet-size and
+retransmission statistics; and duration and inter-arrival statistics. Group
+membership comes only from `FeatureSchema`.
+
+For each causally visible ordered pair, encode the four bits `src-src`,
+`dst-dst`, `src-earlier-dst`, and `dst-earlier-src` as one of 16 relation
+types. A learned scalar for each layer, head, and type is added to the causal
+attention logit. Raw identities, port/protocol similarity, and feature
+similarity are not relation inputs in the proposed architecture.
+Consistently renaming endpoint routing keys must leave model outputs unchanged.
+The destruction control permutes relation types only within
+source/day/relative-time strata so relation and timing marginals are preserved.
+
+## Encoder and inference envelope
+
+One completed flow is one token. The exact record encoder, Transformer shape,
+parameter accounting, and inference-time removal of SSL heads are defined once
+in [Model](Model.md#locked-deployable-backbone). The final completed-flow state
+feeds every downstream head. Bidirectional models are offline-oracle upper
+bounds, never deployable equivalents.
+
+Primary scoring happens at flow completion from that flow and strictly earlier
+completed flows. The only offline oracle may use full bidirectional context and
+is explicitly labelled nondeployable. Live packet-prefix scoring is excluded:
+it requires a versioned active-flow snapshot source with point-in-time field
+availability and separate feature semantics; without that source no
+packet-prefix or real-time claim is evaluated.
+
+The service target is p95 CPU inference no greater than 2 ms per completed
+flow, exclusive of dynamic-batching wait; batching may wait at most 5 ms.
+Endpoint state is at most 32 KiB per active endpoint under the configured
+horizon. Report p50/p95/p99 latency, completed flows/s, device memory,
+endpoint-state memory, and missing-field behaviour. Missing optional fields
+map to the declared tokens and masks, never to another architecture.
+
+## Conditional packet teacher (X1-Distill)
+
+X1-Distill is disabled unless Q3 paired data are legally usable and a refreshed
+novelty review permits the experiment. A pair is accepted only when canonical
+bidirectional five-tuple, protocol, overlapping time interval, and packet/byte
+evidence identify exactly one flow-to-packet span. On 500 manually audited
+pairs, the one-sided 95% lower confidence bound of pairing precision must be at
+least 99%. Ambiguous, unmatched, and boundary-crossing records are excluded.
+
+No teacher pretraining, packet content, or pair from an evaluation capture may
+enter training. The frozen teacher may use packet sizes, directions, timings,
+and protocol bytes; the student receives the headline NetFlow view only and
+aligns completed-flow latents. The teacher is absent at deployment.
+
+Packet material and pair maps are access-controlled, retention-limited,
+encrypted at rest where required, and never released with endpoint keys,
+payload bytes, or re-identifying join evidence. Any released X1-Distill artifact is a
+flow-only checkpoint plus aggregate pairing statistics and approved,
+non-reidentifying metadata. Before release, perform a predeclared membership
+inference test, canary-exposure/retrieval test, nearest-neighbour payload audit,
+and representation-inversion review; a failed privacy or governance review
+removes X1-Distill without blocking the NetFlow-only study.
+
+## Conditional hierarchy (M5-Hier)
+
+M5-Hier exists only after the trigger in [Model](Model.md#evidence-ladder). It uses
+fine 1-second, medium 10-second, and coarse 60-second windows. Within each
+closed history window, permutation-equivariant attention uses elapsed-time
+features and the anonymous endpoint relation tensor; one summary represents
+each non-empty window. Current fine-window events remain ordered causal tokens.
+It receives the identical M3-Ego history and M4-Rel relation tensor as its
+non-hierarchical control; only the aggregation path changes.
+
+M5-Hier reallocates rather than adds Transformer blocks: the first two of the fixed
+eight blocks form one weight-shared window encoder at all three scales, with
+RoPE disabled inside the set and a learned scale token; the remaining six
+blocks apply causal attention with RoPE to time-ordered summaries followed by
+the current fine-window events. There is no second independent Transformer
+stack. Scale tokens, summary projections, record encoder, and all eight blocks
+count toward the same complete 25M ±5% deployable band; reduce FFN width before
+the first M5-Hier run if necessary, then retrain the M4-Rel control at that same width
+and freeze it across the matched comparison. FLOP reports include every
+repeated window-encoder pass and the six-block causal stage.
+
+M5-Hier does not add a GNN, SSM/Mamba block, memory bank, or generative decoder.
+Those remain challengers only if a measured bottleneck justifies a separately
+gated study.

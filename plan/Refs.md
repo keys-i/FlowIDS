@@ -1,6 +1,6 @@
 # Evidence and novelty ledger
 
-**Cutoff:** 2026-08-14. This is a finite audit of original papers, official
+**Cutoff:** 2026-08-17. This is a finite audit of original papers, official
 artifacts, standards, datasets, and one explicitly labeled systematic
 review—not an exhaustive review. Search coverage includes IEEE Xplore, ACM DL, SpringerLink,
 ScienceDirect, USENIX, arXiv, official standards/data/repositories, and
@@ -25,11 +25,11 @@ cannot support a project claim.
 | M1-R | [MMAE2026](#mmae2026) | Generic masked traffic representation learning | MMAE reconstructs five-packet byte flows with FlowMix; M1-R masks NetFlow feature groups | Code released; reproduction UNVERIFIED | Generic masked-flow novelty rejected |
 | M1-L | [MMAE2026](#mmae2026), [data2vec](#data2vec) | Corrupted student aligned to an unmasked EMA teacher | MMAE aligns reconstructed byte-flow tokens; M1-L targets a causal NetFlow event state | MMAE code released | EMA/latent-target novelty rejected |
 | M2-H | [MMAE2026](#mmae2026) | Reconstruction plus EMA latent alignment | Different modality, corruption, context, and target | MMAE code released | Generic hybrid-objective novelty rejected |
-| M2-F | [CPC](#cpc) | Predictive representation learning | No verified record here predicts the specified future endpoint-incident NetFlow states | Not a direct reproduction | Provisional task-specific formulation only |
-| M3-Ego | [CMESCrossFlow2026](#cmescrossflow2026), [MMAE2026](#mmae2026) | Cross-flow organization or corruption | CMES is rule-grouped/bidirectional; MMAE uses a support flow as a patch repository | CMES model code UNVERIFIED | Defensible only after endpoint-defined, past-only causal ablations pass |
+| M2-F | [CPC](#cpc), [NetFlowGen](#netflowgen) | Predictive representation learning and pretrained NetFlow dynamics | No verified record here uses the exact future endpoint-incident latent/aggregate targets under the proposed causal contract | NetFlowGen code/checkpoint UNVERIFIED | No generic next-step novelty; task-specific formulation is provisional |
+| M3-Ego | [CMESCrossFlow2026](#cmescrossflow2026), [MMAE2026](#mmae2026), [VanLangendonckGraphFM](#vanlangendonckgraphfm) | Cross-flow organization, corruption, or endpoint topology | CMES is rule-grouped/bidirectional; MMAE uses a support flow as a patch repository; the graph FM is a different dynamic graph unit | CMES model code UNVERIFIED; graph checkpoint UNVERIFIED | System component only, defensible after endpoint-defined past-only causal ablations pass |
 | M4-Rel | [CMESCrossFlow2026](#cmescrossflow2026) | Four-bit/16-type learned cross-flow attention bias | Proposed bits encode directed endpoint equality under a causal mask | Model code UNVERIFIED | No standalone relation-bias novelty; system component only |
 | M5-Hier | [netFound](#netfound), [MM4flow](#mm4flow), [MMAE2026](#mmae2026) | Multi-granularity or multimodal traffic representation | Different units and hierarchy | netFound/MMAE artifacts available; MM4flow reproduction UNVERIFIED | Hierarchy novelty rejected |
-| X1 | Generic distillation plus [netFound](#netfound) and [MM4flow](#mm4flow) | Packet knowledge transferred into traffic representations | Exact packet-teacher to NetFlow-only student claim not verified in this search | Requires renewed search and paired data | Provisional only |
+| X1-Distill | Generic distillation plus [YaTC](#yatc), [netFound](#netfound), and [MM4flow](#mm4flow) | Packet knowledge transferred into traffic representations | Exact packet-teacher to NetFlow-only student claim not verified in this search; YaTC is a packet-view comparator and conditional teacher candidate, not an interchangeable teacher | Requires renewed search, paired data, and verified preprocessing/checkpoint compatibility | Provisional only |
 
 ## Requested traffic/IDS records
 
@@ -45,6 +45,18 @@ flow-sequence classifier evaluated on NSL-KDD, UNSW-NB15, and
 CSE-CIC-IDS2018. It is a required historical baseline, not SSL, a reusable
 checkpoint, or a foundation model; its published benchmark protocol does not
 establish deployment transfer.
+
+### HistoricalPrototype828582d
+
+keys-i, “added script to get all datasets,” repository commit `828582d0a2b6a8f8fbf090dae84328490563629f`, 22 May 2026,
+https://github.com/keys-i/FlowIDS/commit/828582d0a2b6a8f8fbf090dae84328490563629f.
+Repository artifact. The snapshot configures fixed eight-flow windows over each
+source globally sorted by `FLOW_START_MILLISECONDS`, no positional signal, and
+a bidirectional PyTorch `TransformerEncoder`; its heads make next-flow
+multitask categorical and numeric predictions. It is forensic historical
+evidence only: no eligible checkpoint, immutable data/split artifact, or
+reproducible result accompanies that commit, so it is not a baseline result or
+a precursor foundation model.
 
 ### EGraphSAGE
 
@@ -67,7 +79,8 @@ https://arxiv.org/abs/2207.06819. Official code:
 https://github.com/waimorris/Anomal-E. Modified Deep Graph Infomax trains an
 E-GraphSAGE edge encoder before a separate unsupervised outlier detector. It is
 graph SSL, not a causal Transformer or a pretrained NetFlow foundation model;
-its graph and threshold assumptions remain benchmark-specific.
+its graph and threshold assumptions remain benchmark-specific. See
+[GraphIDS](#graphids) Appendix A for its public-implementation caveat.
 
 ### NFStandardFeatures
 
@@ -175,7 +188,10 @@ https://papers.nips.cc/paper_files/paper/2025/hash/9ddb13ae9150f99298065d889f951
 Official code: https://github.com/lorenzo9uerra/GraphIDS. E-GraphSAGE local
 flow embeddings feed a Transformer masked autoencoder whose reconstruction
 error is an anomaly score. Its reported PR-AUC up to 99.98% is author evidence
-under benchmark protocols, not proof of causal cross-network transfer.
+under benchmark protocols, not proof of causal cross-network transfer. Appendix
+A narrowly reports that the inspected public Anomal-E code used attack labels
+in target encoding; it is an implementation-specific leakage finding, not a
+claim that every Anomal-E experiment is invalid.
 
 ### VanLangendonckGraphFM
 
@@ -286,7 +302,10 @@ vol. 37, no. 4, pp. 5420–5427,
 https://doi.org/10.1609/aaai.v37i4.25674. Official code/checkpoint:
 https://github.com/NSSL-SJTU/YaTC. MAE pretraining operates on formatted
 multi-level flow matrices with packet/flow attention. Its four encrypted
-classification benchmarks do not establish general IDS transfer.
+classification benchmarks do not establish general IDS transfer. It is a
+packet-view comparator and only a conditional X1-Distill teacher candidate: its packet
+formatting, feature preprocessing, and released-checkpoint compatibility with
+paired PCAP/NetFlow data must be verified before it can supervise a student.
 
 ### NetMamba
 
@@ -594,6 +613,106 @@ adjacent foundation-model domain. It does not define traffic equivalence;
 exact and near-duplicate NetFlow keys must still be specified and audited
 before split assignment.
 
+## Duplicate grouping evidence
+
+### NF3SchemaAndTimestamps
+
+M. Luay *et al.*, “Temporal Analysis of NetFlow Datasets for Network Intrusion
+Detection Systems,” arXiv:2503.04404v2, 2025,
+https://arxiv.org/abs/2503.04404; University of Queensland, “NetFlow Datasets,”
+official collection: https://staff.itee.uq.edu.au/marius/NIDS_datasets/. Imported
+evidence: the v3 lineage supplies a documented UQ conversion/schema and temporal
+features, including timestamps, for the four releases recorded in
+[NF3Temporal](#nf3temporal). Limitation: this establishes neither that two
+exports share a meter/configuration nor a semantic equivalence rule; use the
+released schema and acquired-file manifest, never a local audit result, as the
+source record.
+
+### IPFIXSemantics
+
+B. Claise *et al.*, “Specification of the IP Flow Information Export (IPFIX)
+Protocol for the Exchange of Flow Information,” RFC 7011, 2013,
+https://doi.org/10.17487/RFC7011; IANA, “IPFIX Information Elements,”
+https://www.iana.org/assignments/ipfix/ipfix.xhtml. Imported evidence: an IPFIX
+flow is packets sharing properties at an Observation Point during an interval;
+the normative registry defines `flowStartMilliseconds` and
+`flowEndMilliseconds` as the first- and last-packet timestamps. Limitation:
+those fields describe an exported meter record, while Message Header Export Time
+is message time; they do not prove a capture-global session identity or an
+inter-export duplicate relation.
+
+### NProbeTimeouts
+
+ntop, “nProbe 10.0 Command Line Options,” official documentation,
+https://www.ntop.org/guides/nprobe/cli_options.html. Imported evidence:
+`%FLOW_ACTIVE_TIMEOUT` and `%FLOW_INACTIVE_TIMEOUT` are the activity and
+inactivity timeouts of flow-cache entries. Limitation: this documents cache
+expiration controls, not a stable identity or calibrated equivalence across
+independent exports; active/idle settings and version remain manifest fields.
+
+### CanonicalHashes
+
+A. Rundgren *et al.*, “JSON Canonicalization Scheme (JCS),” RFC 8785, 2020,
+https://doi.org/10.17487/RFC8785; NIST, “Secure Hash Standard (SHS),” FIPS
+PUB 180-4, 2015, https://doi.org/10.6028/NIST.FIPS.180-4; H. Krawczyk,
+M. Bellare, and R. Canetti, “HMAC: Keyed-Hashing for Message Authentication,”
+RFC 2104, 1997, https://doi.org/10.17487/RFC2104. Imported evidence: JCS gives
+deterministic JSON serialization for repeatable hashing; FIPS 180-4 specifies
+the SHA family; HMAC combines an iterated hash with a secret key. Limitation:
+canonical bytes plus a lineage-scoped HMAC-SHA-256 establish exact-record
+equality without persisting an endpoint-bearing plaintext digest; keyed hashes
+are routing/grouping tokens, not anonymous semantics or a near-duplicate test.
+
+## Context similarity evidence
+
+### Broder1997
+
+A. Z. Broder, “On the Resemblance and Containment of Documents,” *Compression
+and Complexity of Sequences*, 1997,
+https://doi.org/10.1109/SEQUEN.1997.666900. It defines a document as a canonical
+token sequence, forms contiguous w-shingles, and expresses resemblance as set
+intersection/union (Jaccard). Imported evidence: an explicit, fixed tokenization
+and threshold can define syntactic near-duplicates. Limitation: it supplies no
+traffic-field semantics or calibrated threshold.
+
+### PPJoinPlus
+
+C. Xiao, W. Wang, X. Lin, J. X. Yu, and G. Wang, “Efficient Similarity Joins
+for Near-Duplicate Detection,” *ACM Transactions on Database Systems*, vol. 36,
+no. 3, art. 15, 2011, https://doi.org/10.1145/2000824.2000825. PPJoin+ uses
+filters followed by verification to return record pairs whose set similarity is
+at least a stated threshold. Imported evidence: an exact threshold join is a
+valid candidate-generation implementation after the traffic token set and
+threshold are frozen. Limitation: exactness is relative to that syntactic set
+predicate, not semantic context.
+
+### SparkMinHashLSH
+
+Apache Spark, “MinHash for Jaccard Distance,” official ML documentation,
+https://spark.apache.org/docs/latest/ml-features.html#minhash-for-jaccard-distance.
+Spark labels its similarity joins and nearest-neighbour search approximate and
+defines false negatives as nearby features sent to different buckets. Imported
+evidence: MinHashLSH may accelerate candidate generation only. Limitation: it
+cannot certify zero cross-partition near-duplicate overlap without an exact
+verification pass.
+
+### Charikar2002
+
+M. S. Charikar, “Similarity Estimation Techniques from Rounding Algorithms,”
+*STOC 2002*, pp. 380–388, https://doi.org/10.1145/509907.509965. Its random
+hyperplane family estimates angular/cosine similarity through hash-collision
+probability. Limitation: SimHash/Hamming distance is not a Jaccard or semantic
+context guarantee, so it is not an isolation gate here.
+
+### ContextIsolationDecision
+
+Imported evidence supports exact-record hashing and explicitly parameterized
+syntactic near-duplicate grouping only. Semantic-context hard isolation is
+rejected absent calibrated repeat-export pairs with a predeclared equivalence
+rule and error assessment; exact context hashes are diagnostic/replay evidence
+only, not semantic grouping or a zero-overlap gate. No local uncommitted
+measurement is literature evidence.
+
 ### ComputeScaling
 
 J. Kaplan *et al.*, “Scaling Laws for Neural Language Models,” arXiv:2001.08361,
@@ -664,11 +783,68 @@ https://doi.org/10.17487/RFC3954. Official NetFlow v9 format.
 ### NF3UQData
 
 University of Queensland, “NetFlow Datasets,” official collection:
-https://staff.itee.uq.edu.au/marius/NIDS_datasets/. The v3 release comprises
-NF-UNSW-NB15-v3, NF-ToN-IoT-v3, NF-BoT-IoT-v3, and
-NF-CSE-CIC-IDS2018-v3. There is no official merged `NF-UQ-NIDS-v3`;
-`NF-UQ-NIDS-v2` is a distinct legacy collection. Archive each downloaded
-manifest, license, label definition, collection interval, and hash before use.
+https://staff.itee.uq.edu.au/marius/NIDS_datasets/. This is the official release
+for the four v3 datasets identified in [NF3Temporal](#nf3temporal). There is no
+official merged `NF-UQ-NIDS-v3`; `NF-UQ-NIDS-v2` is a distinct legacy
+collection. Archive each downloaded manifest, license, label definition,
+collection interval, and hash before use.
+
+### CTU13
+
+S. García, M. Grill, J. Stiborek, and A. Zunino, “An empirical comparison of
+botnet detection methods,” *Computers & Security*, vol. 45, pp. 100–123, 2014,
+https://doi.org/10.1016/j.cose.2014.05.011. Official dataset:
+https://stratosphere-ips.squarespace.com/datasets-ctu13; authoritative scenario
+files: https://mcfp.felk.cvut.cz/publicDatasets/datasets.html. Dataset. CTU-13
+provides 13 separately captured scenarios with flow labels `Background`,
+`Botnet`, `C&C Channels`, and `Normal`; scenarios—not arbitrary rows—are the
+defensible split groups. The official description distinguishes `Background`
+from `Normal`; excluding Background from clean-benign fitting is a conservative
+project policy, not a property asserted by the dataset authors.
+The public scenario material does not establish one versioned schema across all
+scenarios, Argus version/timeouts, normalized timezone, a cryptographic release
+manifest, or explicit redistribution terms. The project's current Q0 verdict
+is an admission decision from those missing facts, not a claim that the traffic
+itself is unusable.
+
+### CESNETTLSYear22
+
+K. Hynek, J. Luxemburk, J. Pešek, T. Čejka, and P. Šiška,
+“CESNET-TLS-Year22: A year-spanning TLS network traffic dataset from backbone
+lines,” *Scientific Data*, vol. 11, art. 1156, 2024,
+https://doi.org/10.1038/s41597-024-03927-4. Official dataset/tooling:
+https://cesnet.github.io/cesnet-datazoo/datasets_overview/ and
+https://github.com/CESNET/cesnet-datazoo; versioned data record:
+https://doi.org/10.5281/zenodo.10608607. Dataset. This 2022 corpus contains
+507,739,073 sampled bidirectional TLS flows from five CESNET3 backbone probes,
+with 180 service labels in 24 categories. The source records `ipfixprobe`
+4.0.0--4.7.1, `ipfixcol2` 2.2.1, a five-minute active timeout, and a 65-second
+idle timeout. Its Technical Validation trains on week T and tests on T+1
+through T+8;
+it recommends separate weeks 1–9 and 11–52 because the week-10 exporter update
+changed packet-sequence distributions.
+`TLS_SNI` supplies ground-truth service labels, while `TLS_SNI`, `APP`, and
+`CATEGORY` are label-bearing fields and must not be model inputs for that
+probe. Starts are clipped to the hour and ends are adjusted to preserve
+duration; records do not identify the contributing probe. Those facts block
+strict causal endpoint-history reconstruction, so the project treats this as
+Q0 for its causal ladder. The official Zenodo API records CC BY 4.0, but the
+downloaded release, advertised schema discrepancy around source ports/PPI, and
+selected dates still require audit before any non-causal diagnostic.
+
+### CICIot2022
+
+S. Dadkhah, H. Mahdikhani, P. Kyei Danso, A. Zohourian, K. A. Truong, and
+A. A. Ghorbani, “Towards the Development of a Realistic Multidimensional IoT
+Profiling Dataset,” *2022 19th Annual International Conference on Privacy,
+Security & Trust (PST)*, pp. 1–11, 2022,
+https://doi.org/10.1109/PST55820.2022.9851966. Official dataset:
+https://www.unb.ca/cic/datasets/iotdataset-2022.html. Dataset. The CIC page
+describes power, idle, interaction, scenario, active, and attack captures,
+including multi-device settings and repeated capture groups. It is a device
+probe only if the acquired instance/device and capture-period group structure
+is auditable; otherwise device-disjoint claims are **UNVERIFIED**. Raw MAC/IP
+identifiers are not evidence of transferable device behaviour.
 
 ### UGR16
 
@@ -677,7 +853,11 @@ Cybersecurity Intrusion Detection Systems,” *Computer Security*, 2018.
 Primary DOI: https://doi.org/10.1016/j.cose.2018.03.004. Official dataset:
 https://nesg.ugr.es/nesg-ugr16/. Real ISP background spans months, while test
 attacks are injected; June contains documented anomaly risk and is not assumed
-benign. Archive exact files and labels before use.
+benign. The release exceeds 16.9 billion unidirectional NetFlow v9 records and
+publishes weekly nfcapd/CSV files, but the official sources do not publish a
+licence, timezone, per-record collector identity, or cryptographic release
+manifest. Therefore it is currently Q0 under this project's contract; archive
+and resolve those facts before use.
 
 ### LITNET2020
 
@@ -687,8 +867,10 @@ Real-World Network Flow Dataset for Network Intrusion Detection,”
 *Electronics*, vol. 9, no. 5, 800, 2020,
 https://doi.org/10.3390/electronics9050800. Official data:
 https://dataset.litnet.lt/data.php. The authors report 85 features and 12
-attack types from an academic network. Downloaded schema, license, chronology,
-and split suitability must still be audited.
+attack types across 45,330,333 academic-network flows. Published material does
+not resolve exporter version/timeouts, timezone, bidirectional completion,
+formal redistribution terms, or release hashes. It is currently Q0; downloaded
+schema, label rules, chronology, and split suitability still require audit.
 
 ### CICDocs
 
@@ -699,8 +881,23 @@ CICDDoS2019) must supply collection/labels; benchmark splits are not implied.
 ### MAWI
 
 WIDE Project, “MAWI Working Group Traffic Archive,” official archive.
-https://mawi.wide.ad.jp/mawi/. Raw traces; labels and privacy transformations
-are not supplied by the archive as IDS ground truth.
+https://mawi.wide.ad.jp/mawi/; privacy and use rules:
+https://mawi.wide.ad.jp/mawi/guideline.txt; capture FAQ:
+https://mawi.wide.ad.jp/mawi/faq.html. WIDE permits research use and prohibits
+privacy-invasive use; redistribution of derived flow/pairing data is not
+clearly granted. Samplepoint-F provides timestamped, anonymized backbone PCAP,
+but endpoint mappings for ordinary daily traces are stable only within one
+trace, timestamps have NTP/commodity-capture limitations, and mirrored traffic
+may be incomplete or asymmetric. A frozen local PCAP-to-bidirectional-flow
+conversion with input/tool/config hashes and packet accounting is a plausible
+Q1 route; until that evidence exists it remains Q0. Selected traces may then
+support unlabeled SSL, drift, or alert-volume analysis, not IDS ground truth.
+MAWILab is
+a separate anomaly-label service for MAWI samplepoints B and F: R. Fontugne,
+P. Borgnat, P. Abry, and K. Fukuda, “MAWILab: Combining diverse anomaly
+detectors for automated anomaly labeling and performance benchmarking,” *CoNEXT
+2010*, https://www.fukuda-lab.org/mawilab/. MAWILab data updates stopped in
+December 2024; do not treat post-2024 MAWI traces as MAWILab-labelled data.
 
 ## Explicit exclusions
 
