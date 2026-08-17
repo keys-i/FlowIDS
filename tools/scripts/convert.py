@@ -7,6 +7,7 @@ Examples:
 
 import glob
 import os
+import tempfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Literal
@@ -76,13 +77,24 @@ def convert(
         return "skipped", output, input_size, output.stat().st_size
 
     output.parent.mkdir(parents=True, exist_ok=True)
-    frame = pl.scan_csv(source, infer_schema_length=infer_schema_length)
-    if hasattr(frame, "sink_parquet"):
-        _ = frame.sink_parquet(output, compression=compression, compression_level=compression_level)
-    else:
-        frame.collect().write_parquet(
-            output, compression=compression, compression_level=compression_level
-        )
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{output.name}.", suffix=".parquet", dir=output.parent
+    )
+    os.close(descriptor)
+    temporary = Path(temporary_name)
+    try:
+        frame = pl.scan_csv(source, infer_schema_length=infer_schema_length)
+        if hasattr(frame, "sink_parquet"):
+            _ = frame.sink_parquet(
+                temporary, compression=compression, compression_level=compression_level
+            )
+        else:
+            frame.collect().write_parquet(
+                temporary, compression=compression, compression_level=compression_level
+            )
+        os.replace(temporary, output)
+    finally:
+        temporary.unlink(missing_ok=True)
     return "converted", output, input_size, output.stat().st_size
 
 

@@ -22,6 +22,7 @@ jobs:
       - name: Package model
         run: |
           git archive --format=tar.gz --prefix=flowids/ --output=flowids.tar.gz "$GITHUB_SHA"
+          pixi run --frozen release-check flowids.tar.gz
           sha256sum flowids.tar.gz > flowids.tar.gz.sha256
       - name: Publish release
         env:

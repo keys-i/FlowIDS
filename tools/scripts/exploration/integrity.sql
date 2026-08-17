@@ -77,3 +77,145 @@ WITH flows AS (
 SELECT data_file, completion_day, flows, sum(flows) OVER (PARTITION BY data_file ORDER BY completion_day) AS cumulative_flows
 FROM daily
 ORDER BY data_file, completion_day;
+
+-- DIAGNOSTIC ONLY (never a D0 gate): strict, label-blind raw-field keys.
+-- `data_file` is only a lineage/observation-domain proxy; the result is not
+-- equivalent to NF3-v1 until that one-file/one-domain assumption is verified.
+-- `occurrences` retains row multiplicity rather than deduplicating it.
+WITH flows AS (
+    SELECT
+        filename AS data_file,
+        IPV4_SRC_ADDR,
+        L4_SRC_PORT,
+        IPV4_DST_ADDR,
+        L4_DST_PORT,
+        PROTOCOL,
+        FLOW_START_MILLISECONDS,
+        FLOW_END_MILLISECONDS,
+        IN_PKTS,
+        IN_BYTES,
+        OUT_PKTS,
+        OUT_BYTES,
+        TCP_FLAGS,
+        CLIENT_TCP_FLAGS,
+        SERVER_TCP_FLAGS
+    FROM read_parquet(getvariable('parquet_file'), filename = true, union_by_name = true)
+), sources AS (
+    SELECT DISTINCT data_file
+    FROM flows
+), near_keys AS (
+    SELECT
+        data_file,
+        IPV4_SRC_ADDR,
+        L4_SRC_PORT,
+        IPV4_DST_ADDR,
+        L4_DST_PORT,
+        PROTOCOL,
+        FLOW_START_MILLISECONDS,
+        FLOW_END_MILLISECONDS,
+        IN_PKTS,
+        IN_BYTES,
+        OUT_PKTS,
+        OUT_BYTES,
+        TCP_FLAGS,
+        CLIENT_TCP_FLAGS,
+        SERVER_TCP_FLAGS,
+        count(*) AS occurrences
+    FROM flows
+    GROUP BY ALL
+    HAVING count(*) > 1
+), summary AS (
+    SELECT
+        data_file,
+        count(*) AS raw_strict_key_groups,
+        sum(occurrences) AS raw_strict_key_rows,
+        sum(occurrences - 1) AS repeated_rows
+    FROM near_keys
+    GROUP BY data_file
+)
+SELECT
+    sources.data_file,
+    coalesce(summary.raw_strict_key_groups, 0) AS raw_strict_key_groups,
+    coalesce(summary.raw_strict_key_rows, 0) AS raw_strict_key_rows,
+    coalesce(summary.repeated_rows, 0) AS repeated_rows
+FROM sources
+LEFT JOIN summary USING (data_file)
+ORDER BY sources.data_file;
+
+-- DIAGNOSTIC ONLY (never a D0 gate): ordered-adjacency ±1ms lower bound.
+-- It does not enumerate every qualifying pair. Even this lower bound exhibits
+-- transitive bridges, so fuzzy connected components are rejected. DuckDB hash
+-- is an exploratory tie-breaker only, not a portable ID.
+WITH flows AS (
+    SELECT
+        filename AS data_file,
+        IPV4_SRC_ADDR,
+        L4_SRC_PORT,
+        IPV4_DST_ADDR,
+        L4_DST_PORT,
+        PROTOCOL,
+        IN_PKTS,
+        IN_BYTES,
+        OUT_PKTS,
+        OUT_BYTES,
+        TCP_FLAGS,
+        CLIENT_TCP_FLAGS,
+        SERVER_TCP_FLAGS,
+        FLOW_START_MILLISECONDS,
+        FLOW_END_MILLISECONDS,
+        hash(
+            IPV4_SRC_ADDR, L4_SRC_PORT, IPV4_DST_ADDR, L4_DST_PORT, PROTOCOL,
+            IN_PKTS, IN_BYTES, OUT_PKTS, OUT_BYTES, TCP_FLAGS,
+            CLIENT_TCP_FLAGS, SERVER_TCP_FLAGS
+        ) AS key_hash,
+        hash(
+            IPV4_SRC_ADDR, L4_SRC_PORT, IPV4_DST_ADDR, L4_DST_PORT, PROTOCOL,
+            IN_PKTS, IN_BYTES, OUT_PKTS, OUT_BYTES, TCP_FLAGS,
+            CLIENT_TCP_FLAGS, SERVER_TCP_FLAGS, FLOW_START_MILLISECONDS,
+            FLOW_END_MILLISECONDS
+        ) AS row_hash
+    FROM read_parquet(getvariable('parquet_file'), filename = true, union_by_name = true)
+    WHERE FLOW_START_MILLISECONDS IS NOT NULL
+      AND FLOW_END_MILLISECONDS IS NOT NULL
+), adjacent AS (
+    SELECT
+        *,
+        lag(FLOW_START_MILLISECONDS) OVER near_key AS prior_start,
+        lag(FLOW_END_MILLISECONDS) OVER near_key AS prior_end
+    FROM flows
+    WINDOW near_key AS (
+        PARTITION BY data_file, key_hash
+        ORDER BY FLOW_START_MILLISECONDS, FLOW_END_MILLISECONDS, row_hash
+    )
+), chains AS (
+    SELECT
+        *,
+        sum(CASE WHEN prior_start IS NULL
+                      OR abs(FLOW_START_MILLISECONDS - prior_start) > 1
+                      OR abs(FLOW_END_MILLISECONDS - prior_end) > 1
+                 THEN 1 ELSE 0 END) OVER near_key AS chain_id
+    FROM adjacent
+    WINDOW near_key AS (
+        PARTITION BY data_file, key_hash
+        ORDER BY FLOW_START_MILLISECONDS, FLOW_END_MILLISECONDS, row_hash
+    )
+), chain_summary AS (
+    SELECT
+        data_file,
+        key_hash,
+        chain_id,
+        count(*) AS chain_rows,
+        max(FLOW_START_MILLISECONDS) - min(FLOW_START_MILLISECONDS) AS start_span_ms,
+        max(FLOW_END_MILLISECONDS) - min(FLOW_END_MILLISECONDS) AS end_span_ms
+    FROM chains
+    GROUP BY data_file, key_hash, chain_id
+)
+SELECT
+    data_file,
+    count_if(chain_rows > 1) AS lower_bound_adjacency_chains,
+    coalesce(sum(chain_rows) FILTER (WHERE chain_rows > 1), 0) AS lower_bound_adjacency_rows,
+    count_if(chain_rows > 2 AND (start_span_ms > 1 OR end_span_ms > 1)) AS lower_bound_bridging_chains,
+    coalesce(sum(chain_rows) FILTER (WHERE chain_rows > 2 AND (start_span_ms > 1 OR end_span_ms > 1)), 0) AS lower_bound_bridging_rows
+FROM chain_summary
+GROUP BY data_file
+ORDER BY data_file;

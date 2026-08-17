@@ -18,6 +18,10 @@ tqdm = "*"
 
 [tasks]
 convert = "python tools/scripts/convert.py"
+d0 = "python tools/scripts/d0.py"
+mawi = "python tools/scripts/mawi.py"
+mawi-split = "python -m tools.scripts.mawi_split"
+release-check = "python tools/scripts/release_check.py"
 
 [feature.dev.dependencies]
 basedpyright = "*"
@@ -29,7 +33,8 @@ lint = "ruff check . --config tools/configs/ruff.toml"
 format = "ruff format . --config tools/configs/ruff.toml"
 format-check = "ruff format --check . --config tools/configs/ruff.toml"
 typecheck = "basedpyright tools/scripts"
-check = { depends-on = ["lint", "format-check", "typecheck"] }
+test = "python -m unittest discover -s tests -v"
+check = { depends-on = ["lint", "format-check", "typecheck", "test"] }
 
 [environments]
 dev = ["dev"]
