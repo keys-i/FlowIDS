@@ -230,9 +230,9 @@ freeze the sequence. Every 100 updates I log gradients and objective-gradient
 cosines. If over 50% conflict for three epochs, I test one compute-matched
 alternating schedule.
 
-**Unresolved:** a 20% source cap needs at least five sources. We have three
-development datasets, and CIC must stay held out. Set a feasible mixture
-before S0; M0 does not implement this cap.
+**Unresolved:** a 20% source cap needs at least five sources. Current M0–M2
+runs use only CIC-IDS2018 and do not apply this cap. Define a feasible source
+mixture and separate transfer targets before the later scaling experiments.
 
 At validation I record embedding spread, covariance eigenvalues, active/effective
 rank, correlation, cosine, alignment, uniformity, gradients, and source/day/entity

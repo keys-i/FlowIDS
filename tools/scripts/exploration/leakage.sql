@@ -1,4 +1,4 @@
-SET VARIABLE parquet_file = coalesce(getvariable('parquet_file'), 'data/publish/data/NF-*-v3.parquet');
+SET VARIABLE parquet_file = coalesce(getvariable('parquet_file'), 'data/NF-CSE-CIC-IDS2018-v3.parquet');
 
 -- I(feature; target) / H(target): 0 is no observed association; 1 is in-sample determination.
 -- Treat high-cardinality scores as screening signals until group/time holdout confirmation.

@@ -68,6 +68,7 @@ def lint() -> None:
     run("basedpyright", "--project", BASEDPYRIGHT)
     run(sys.executable, "-m", "src.data.load")
     run(sys.executable, "-m", "src.metrics")
+    run(sys.executable, "-m", "src.train")
     run(sys.executable, "-m", "src.m1.network")
     run(sys.executable, "-m", "src.m2.data")
     run(sys.executable, "-m", "src.m2.network")

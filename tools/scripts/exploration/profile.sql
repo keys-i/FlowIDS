@@ -1,4 +1,4 @@
-SET VARIABLE parquet_file = coalesce(getvariable('parquet_file'), 'data/publish/data/NF-*-v3.parquet');
+SET VARIABLE parquet_file = coalesce(getvariable('parquet_file'), 'data/NF-CSE-CIC-IDS2018-v3.parquet');
 
 SELECT
     file_name AS data_file,
