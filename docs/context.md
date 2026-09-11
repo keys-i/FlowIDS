@@ -1,7 +1,7 @@
 # Handoff
 
 **Updated:** 11 September 2026 from the local M0, M1, and M2 implementations.
-No real-data or cluster run is recorded.
+No completed real-data or cluster run is recorded.
 
 Start with the [repository README](../README.md#run-a-model). The [model ladder](plan/Model.md) separates the implemented models from later
 plans; [paper notes](notes/README.md) explain the research.
@@ -24,7 +24,8 @@ plans; [paper notes](notes/README.md) explain the research.
 - All variants use the same single NF3 dataset
 - Saved per-flow predictions and `pixi run plot` for figures and error examples
 - `--seed` writes separate runs; comparison error bars show sample standard deviation
-- `model` uses a three-hour budget; `model max` allows 72 hours and writes under `max/`
+- Models run to the epoch limit or early stopping without application time caps; `max` writes under `max/`
+- `pixi run timing` measures full stages and estimates configured-epoch runtime in tables
 - Static checks through `pixi run lint`; no test directory
 
 M0 is a FlowTransformer-style baseline with local implementation changes. It
@@ -62,9 +63,11 @@ Few-label and cross-network comparisons remain planned; M3 and later are not imp
 On Bunya, the [array launcher](../tools/scripts/slurm.sh) runs one job per
 variant across M0 Base/Small/Matched, M1 reconstruct/teacher, and all three M2 variants, writing to
 `results/<model>-<variant>/`. It still needs the real Slurm account before submission.
-The [README commands](../README.md#run-on-bunya) select three or 72 hours for all
-eight jobs. Batch deadlines leave time for evaluation; incomplete runs are excluded
-from plots. These budgets have not been measured on H100 hardware.
+The [README commands](../README.md#run-on-bunya) request three or 72 hours by
+default; explicit `--time` overrides them. Slurm enforces that allocation.
+Validation and test evaluation run in full, with no separate application
+deadlines; incomplete runs are excluded from plots. Full-data runtime has not
+been measured on H100 hardware.
 
 ## Conventions
 

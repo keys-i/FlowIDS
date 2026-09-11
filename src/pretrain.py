@@ -2,6 +2,7 @@
 
 import json
 import math
+from collections.abc import Callable
 from pathlib import Path
 from time import perf_counter
 from typing import cast
@@ -14,7 +15,8 @@ from src.config import Config
 from src.m1.masking import sample_mask
 from src.m1.network import Pretrainer
 from src.m2.network import M2Pretrainer
-from src.train import Batch, TimeLimit, batches, move, setup_optimizer
+from src.timing import Timing
+from src.train import Batch, move, setup_optimizer
 
 
 def spread(states: Tensor) -> dict[str, float]:
@@ -50,8 +52,6 @@ def validate(
     loader: DataLoader[Batch],
     config: Config,
     device: torch.device,
-    *,
-    deadline: float = math.inf,
 ) -> tuple[float, dict[str, float]]:
     """Score fixed validation masks and sample vectors for collapse diagnostics
 
@@ -60,7 +60,6 @@ def validate(
         loader: Unlabeled validation histories, never final test flows
         config: Masking settings and run seed
         device: Inference device
-        deadline: Raise TimeLimit if validation cannot finish in time
 
     Returns:
         Example-weighted masked loss and, for teacher models, teacher/student diagnostics
@@ -76,7 +75,7 @@ def validate(
     try:
         # Fixed validation masks must not advance the training random stream
         with torch.random.fork_rng(devices=[]):
-            for index, batch in enumerate(batches(loader, deadline)):
+            for index, batch in enumerate(loader):
                 batch = move(batch, device)
                 mask = sample_mask(
                     batch["padding"].cpu(),
@@ -111,8 +110,6 @@ def balance_losses(
     loader: DataLoader[Batch],
     config: Config,
     device: torch.device,
-    *,
-    deadline: float = math.inf,
 ) -> dict[str, float | int]:
     """Set inverse-median weights from 200 training-only forward batches
 
@@ -129,12 +126,12 @@ def balance_losses(
     generator = torch.Generator().manual_seed(config.run.seed)
     try:
         with torch.random.fork_rng(devices=[]):
-            iterator = iter(batches(loader, deadline))
+            iterator = iter(loader)
             for _ in range(200):
                 try:
                     batch = next(iterator)
                 except StopIteration:
-                    iterator = iter(batches(loader, deadline))
+                    iterator = iter(loader)
                     batch = next(iterator)
                 batch = move(batch, device)
                 mask = sample_mask(
@@ -174,7 +171,7 @@ def pretrain(
     config: Config,
     device: torch.device,
     *,
-    deadline: float = math.inf,
+    timing: Timing | None = None,
 ) -> list[dict[str, float | int]]:
     """Pretrain M1/M2 and restore the best noncollapsed validation weights
 
@@ -184,7 +181,7 @@ def pretrain(
         validation_loader: Unlabeled validation histories
         config: Pretraining and shared optimizer settings
         device: Training device
-        deadline: Phase cutoff, with the last fifth reserved for validation
+        timing: Optional stage timer and one-epoch training pilot
 
     Returns:
         Loss, exposure, timing, and spread history
@@ -205,9 +202,11 @@ def pretrain(
     optimizer, scheduler = setup_optimizer(model, train, steps)
     amp = bool(train.amp and device.type == "cuda")
     scaler = torch.amp.GradScaler("cuda", enabled=amp)
-    train_deadline = perf_counter() + (deadline - perf_counter()) * 0.8
+    mark: Callable[[str | None], None] = timing.mark if timing is not None else lambda stage: None
+    if isinstance(model, M2Pretrainer) and len(model.loss_names) > 1:
+        mark("Loss balancing")
     calibration = (
-        balance_losses(model, train_loader, config, device, deadline=train_deadline)
+        balance_losses(model, train_loader, config, device)
         if isinstance(model, M2Pretrainer) and len(model.loss_names) > 1
         else {}
     )
@@ -216,59 +215,51 @@ def pretrain(
     best_loss = float("inf")
     stale = collapsed = updates = exposures = future_exposures = 0
     momentum = pre.ema_start
-    for epoch in range(1, pre.epochs + 1):
-        if perf_counter() >= train_deadline:
-            break
+    epochs = 1 if timing is not None and timing.sample_batches else pre.epochs
+    for epoch in range(1, epochs + 1):
         _ = model.train()
         started = perf_counter()
+        mark("Pretrain train")
         loss_total = torch.zeros((), device=device)
         count = 0
-        try:
-            for batch in batches(train_loader, train_deadline):
-                batch = move(batch, device)
-                mask = sample_mask(batch["padding"], pre.mask_fraction, pre.span)
-                optimizer.zero_grad(set_to_none=True)
-                with torch.autocast(device_type=device.type, enabled=amp):
-                    loss, _, _ = model(batch, mask)
-                if not torch.isfinite(loss):
-                    raise ValueError("pretraining loss is not finite")
-                scaler.scale(loss).backward()
-                _ = scaler.unscale_(optimizer)
-                _ = torch.nn.utils.clip_grad_norm_(model.parameters(), train.gradient_clip)
-                previous_scale = scaler.get_scale()
-                _ = scaler.step(optimizer)
-                _ = scaler.update()
-                if scaler.get_scale() >= previous_scale:
-                    momentum = (
-                        pre.ema_start
-                        + (pre.ema_end - pre.ema_start)
-                        * (1 - math.cos(math.pi * updates / max(steps - 1, 1)))
-                        / 2
-                    )
-                    model.update_teacher(momentum)
-                    scheduler.step()
-                    updates += 1
-                loss_total += loss.detach() * len(mask)
-                count += len(mask)
-                exposures += int((~batch["padding"]).sum())
-                if "future_padding" in batch:
-                    future_exposures += int((~batch["future_padding"]).sum())
-        except TimeLimit:
-            print("Pretraining time used; finishing validation")
+        source = timing.training(train_loader) if timing is not None else train_loader
+        for batch in source:
+            batch = move(batch, device)
+            mask = sample_mask(batch["padding"], pre.mask_fraction, pre.span)
+            optimizer.zero_grad(set_to_none=True)
+            with torch.autocast(device_type=device.type, enabled=amp):
+                loss, _, _ = model(batch, mask)
+            if not torch.isfinite(loss):
+                raise ValueError("pretraining loss is not finite")
+            scaler.scale(loss).backward()
+            _ = scaler.unscale_(optimizer)
+            _ = torch.nn.utils.clip_grad_norm_(model.parameters(), train.gradient_clip)
+            previous_scale = scaler.get_scale()
+            _ = scaler.step(optimizer)
+            _ = scaler.update()
+            if scaler.get_scale() >= previous_scale:
+                momentum = (
+                    pre.ema_start
+                    + (pre.ema_end - pre.ema_start)
+                    * (1 - math.cos(math.pi * updates / max(steps - 1, 1)))
+                    / 2
+                )
+                model.update_teacher(momentum)
+                scheduler.step()
+                updates += 1
+            loss_total += loss.detach() * len(mask)
+            count += len(mask)
+            exposures += int((~batch["padding"]).sum())
+            if "future_padding" in batch:
+                future_exposures += int((~batch["future_padding"]).sum())
         if not count:
-            break
+            raise ValueError("pretraining loader produced no targets")
         train_loss = float(loss_total) / count
         seconds = perf_counter() - started
         started = perf_counter()
-        try:
-            validation_loss, diagnostics = validate(
-                model, validation_loader, config, device, deadline=deadline
-            )
-        except TimeLimit:
-            if not best_state:
-                raise TimeLimit("pretraining needs one complete, noncollapsed validation") from None
-            print("Pretraining validation timed out; keeping the earlier best weights")
-            break
+        mark("Pretrain validation")
+        validation_loss, diagnostics = validate(model, validation_loader, config, device)
+        mark("Pretrain select")
         entry: dict[str, float | int] = {
             "epoch": epoch,
             "train_loss": train_loss,
@@ -319,5 +310,6 @@ def pretrain(
                 break
     if not best_state:
         raise ValueError("pretraining produced no noncollapsed checkpoint")
+    mark("Pretrain restore")
     _ = model.load_state_dict(best_state)
     return history

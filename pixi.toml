@@ -25,5 +25,6 @@ fmt = "python tools/scripts/tools.py fmt"
 clean = "python tools/scripts/tools.py clean"
 lint = "python tools/scripts/tools.py lint"
 model = "python -m src.main"
+timing = "python -m tools.scripts.timing"
 plot = "python tools/scripts/plot.py"
 check = { depends-on = ["fmt", "lint"] }

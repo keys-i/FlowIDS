@@ -38,17 +38,16 @@ pixi run model M0 small
 | `pixi run model M2 future-hybrid` | Hybrid loss plus later endpoint-related teacher targets |
 | `pixi run model M2 future-jepa` | Future teacher-vector prediction only |
 
-`model` has a three-hour budget. Add `max` before the model name for 72 hours:
+Training runs until the configured epoch limit or early stopping, with no
+application time cap. Add `max` before the model name to use a separate output folder:
 
 ```bash
 pixi run model max M0 small
 ```
 
-Both stop earlier if their epoch limit or early stopping is reached. Data
-preparation counts toward the budget. Training reserves the final fifth for
-test evaluation; M1/M2 split the training time between pretraining and
-classification. Each phase also leaves time for validation. Batch counts and
-timings are saved in the histories; three-hour runs may stop partway through an epoch.
+Every completed epoch includes full validation. Pretraining, classification,
+and test evaluation have no separate time budgets. Batch counts and timings
+are saved in the histories. Slurm still enforces the job's requested `--time`.
 
 Settings live in `tools/config/m0.*.toml`, `m1.*.toml`, and `m2.*.toml`. Pretrained variants
 share a four-layer, 256-wide encoder. The teacher is a moving average of the
@@ -57,14 +56,11 @@ student and receives no gradient updates.
 Every run uses a chronological 70/15/15 split with a purge around boundaries.
 Preprocessing learns only from the training period. The run prints its device,
 model size, target counts, and epoch losses. Results go to `results/<model>-<variant>/`.
-The 72-hour runs use its `max/` subfolder. Use `--evaluate-only` with the same
+Runs started with `max` use its `max/` subfolder. Use `--evaluate-only` with the same
 command to score its saved checkpoint without training.
 
-Time checks happen between batches. Slow data preparation, batches, or file
-writes can overrun the local budget; Slurm enforces the allocation limit.
 Weights are saved before test evaluation. A run whose full evaluation does
 not finish stays marked incomplete in `status.json` and is excluded from plots.
-If no classification validation finishes, the latest trained weights are saved.
 Pretraining must finish at least one noncollapsed validation before fine-tuning.
 
 ## Follow the code
@@ -169,7 +165,53 @@ The array has no concurrency cap: all eight may run together if GPUs and account
 limits allow. Do not add `%2` to `--array` if you want all eight running at once.
 Eight GPUs for three hours use up to 24 GPU-hours; 72 hours allows 576 GPU-hours.
 Queue time is separate. The script sets the [Slurm time limit](https://slurm.schedmd.com/sbatch.html#OPT_time)
-when it submits the array. Full-data H100 runtime has not been measured.
+when it submits the array; an explicit `--time` overrides the default. There
+is no additional application cap. Full-data H100 runtime has not been measured.
+
+## Time the pipeline
+
+Run a timing pilot for the three M2 variants with a longer allocation:
+
+```bash
+sbatch --account=a_css --partition=gpu_sxm --qos=gpu \
+  --gres=gpu:h100:1 --constraint=cuda80gb --array=5-7 --time=72:00:00 \
+  tools/scripts/slurm.sh max timing
+```
+
+After the jobs finish, combine their stage timings into tables:
+
+```bash
+pixi run timing --report --array 5-7 --mode max
+```
+
+Use `--array=0-7` and `--array 0-7` respectively for all eight variants.
+The tables show each stage, the full configured-epoch estimate, training batch
+variation, and whether the total fits the scheduler allocation. Normal and
+`max` use identical models and epoch limits. The launcher's defaults request
+three and 72 hours respectively; an explicit allocation replaces both table
+comparisons and can exceed those defaults. A failed pilot shows the stages
+measured so far and marks its total incomplete.
+
+Each pilot runs five warm-up and 30 measured training batches per phase using
+the actual batch size, workers, histories, AMP, optimizer, and teacher updates.
+Data preparation, the 200 hybrid balancing batches, validation, test evaluation,
+metrics, and file writes run in full. A pilot can therefore still take substantial
+time on the full dataset. Estimates assume steady throughput and all configured
+epochs; early stopping and later performance variation cannot be predicted.
+
+Inside a GPU allocation, use `pixi run timing --array 5-7 --batches 90` for more
+samples, or `pixi run timing --array 5-7 --full --mode max` to measure actual full
+runs. Outside a Slurm job, `--time 72:00:00` sets the allocation to compare;
+it never stops training. Choose a duration your partition and account permit.
+Direct runs process the selected variants sequentially; Slurm arrays run them
+independently on one GPU each. Queue and Python/Slurm launcher time are excluded.
+
+`--unit ns` displays integer nanoseconds. The timer synchronizes GPU work at
+stage and sample-block boundaries and uses `perf_counter_ns`; nanosecond units
+do not mean nanosecond prediction accuracy. Logs and timing JSON live under
+`timings/`, separate from model results. Pilot checkpoints are temporary; full
+timing runs retain their checkpoints there. Run the regression check with
+`pixi run python -m tools.scripts.test_timing`.
 
 ## Other commands
 
